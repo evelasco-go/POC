@@ -1,0 +1,39 @@
+trigger: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  TF_VAR_resource_group_name: 'MyResourceGroup'
+  TF_VAR_location: 'East US'
+  TF_VAR_storage_account_name: 'mystorageacct123'
+  TF_VAR_container_name: 'tfstate'
+  TF_VAR_aks_name: 'MyAKSCluster'
+  TF_VAR_node_count: 2
+
+stages:
+- stage: TerraformDeployment
+  displayName: "Deploy Infrastructure and AKS"
+  jobs:
+  - job: Terraform
+    displayName: "Run Terraform"
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Software Development(15e60859-88d7-4c84-943f-55488479910c)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Install Terraform
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+          apt-get update && apt-get install -y terraform
+
+          # Initialize Terraform
+          terraform init
+
+          # Run Terraform Plan
+          terraform plan -out=tfplan
+
+          # Apply Terraform Plan
+          terraform apply -auto-approve tfplan
