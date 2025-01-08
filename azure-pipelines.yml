@@ -9,9 +9,9 @@ variables:
   AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
   AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
-  resource_group_name: 'MyResourceGroup'  # Override if needed
+  resource_group_name: 'POCMyResourceGroup'  # Override if needed
   location: 'East US'                     # Override if needed
-  storage_account_name: 'mystorageacct123'  # Override if needed
+  storage_account_name: 'POCmystorageacct123'  # Override if needed
   container_name: 'tfstate'               # Override if needed
   aks_name: 'MyAKSCluster'                # Override if needed
   node_count: 2                           # Override if needed
