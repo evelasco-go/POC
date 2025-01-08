@@ -4,7 +4,7 @@ variables:
   AZURE_CLIENT_ID: $(azure_client_id)  # Set these values in the Azure DevOps pipeline variables or environment
   AZURE_CLIENT_SECRET: $(azure_client_secret)
   AZURE_TENANT_ID: $(azure_tenant_id)
-  azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Use the correct Service Connection name here
+  AZURE_SUBSCRIPTION_ID: $(azure_subscription_id)
   RESOURCE_GROUP_NAME: "MyResourceGroup"
   STORAGE_ACCOUNT_NAME: "mystorageacct123"
   CONTAINER_NAME: "tfstate"
@@ -19,17 +19,14 @@ stages:
       - job: TerraformInitJob
         displayName: "Terraform Init"
         steps:
-          - task: AzureCLI@2
+          - task: TerraformInstaller@0
+            displayName: 'Install Terraform'
+
+          - task: TerraformTaskV1@0
+            displayName: 'Terraform Init'
             inputs:
-              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # Authenticate using the Service Principal
-                az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
-                
-                # Initialize Terraform
-                terraform init -reconfigure  # Reconfigure the backend
+              provider: 'azurerm'
+              command: 'init'
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
@@ -37,21 +34,12 @@ stages:
       - job: TerraformPlanJob
         displayName: "Run Terraform Plan"
         steps:
-          - task: AzureCLI@2
+          - task: TerraformTaskV1@0
+            displayName: 'Terraform Plan'
             inputs:
-              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # Authenticate using the Service Principal
-                az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
-
-                # Run Terraform Plan
-                terraform plan -out=tfplan
-
-                # Upload the plan as an artifact
-                echo "Uploading plan artifact..."
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
+              provider: 'azurerm'
+              command: 'plan'
+              environmentServiceName: $(azure_subscription)  # Ensure this is set to the correct service connection
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
@@ -65,18 +53,9 @@ stages:
           runOnce:
             deploy:
               steps:
-                - download: tfplan
-                  artifact: tfplan
-                  displayName: "Download Plan Artifact"
-
-                - task: AzureCLI@2
+                - task: TerraformTaskV1@0
+                  displayName: 'Terraform Apply'
                   inputs:
-                    azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
-                    scriptType: 'bash'
-                    scriptLocation: 'inlineScript'
-                    inlineScript: |
-                      # Authenticate using the Service Principal
-                      az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
-
-                      # Apply the Terraform plan
-                      terraform apply -auto-approve tfplan
+                    provider: 'azurerm'
+                    command: 'apply'
+                    environmentServiceName: $(azure_subscription)  # Ensure this is set to the correct service connection
