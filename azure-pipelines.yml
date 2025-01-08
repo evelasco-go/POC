@@ -9,8 +9,8 @@ variables:
   AZURE_TENANT_ID: $(azure_tenant_id)
   AZURE_SUBSCRIPTION_ID: $(azure_subscription_id)
   azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-  RESOURCE_GROUP_NAME: "MyResourceGroup"
-  STORAGE_ACCOUNT_NAME: "mystorageacct123"
+  RESOURCE_GROUP_NAME: "POCMyResourceGroup"
+  STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
   CONTAINER_NAME: "tfstate"
   AKS_NAME: "MyAKSCluster"
   LOCATION: "East US"
