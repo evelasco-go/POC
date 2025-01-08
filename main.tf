@@ -7,15 +7,6 @@ provider "azurerm" {
   tenant_id       = var.azure_tenant_id
 }
 
-terraform {
-  backend "azurerm" {
-    resource_group_name  = var.resource_group_name
-    storage_account_name = var.storage_account_name
-    container_name       = var.container_name
-    key                  = "terraform.tfstate"
-  }
-}
-
 # Resource Group
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
