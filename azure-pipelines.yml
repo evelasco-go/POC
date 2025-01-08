@@ -25,67 +25,49 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: '$(azure_subscription)'
+              azureSubscription: $(azure_subscription)  # Use the correct service connection
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
                 # Create Resource Group
-                az group create --location "${{ variables.LOCATION }}" --resource-group "${{ variables.RESOURCE_GROUP_NAME }}"
+                az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
 
-                # Create Storage Account
+                # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
                 az storage account create \
-                  --name "${{ variables.STORAGE_ACCOUNT_NAME }}" \
-                  --resource-group "${{ variables.RESOURCE_GROUP_NAME }}" \
-                  --location "${{ variables.LOCATION }}" \
+                  --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
+                  --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
+                  --location "East US" \
                   --sku Standard_LRS
 
-                # Create Storage Container
+                # Create a container to store Terraform state
                 az storage container create \
-                  --name "${{ variables.CONTAINER_NAME }}" \
-                  --account-name "${{ variables.STORAGE_ACCOUNT_NAME }}"
+                  --name ${{ variables.CONTAINER_NAME }} \
+                  --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
 
   - stage: TerraformInit
     displayName: "Initialize Terraform"
-    dependsOn: CreateResources
     jobs:
       - job: TerraformInitJob
         displayName: "Terraform Init"
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: '$(azure_subscription)'
+              azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Authenticate with Service Principal
-                az login --service-principal \
-                  -u "${{ variables.AZURE_CLIENT_ID }}" \
-                  -p "${{ variables.AZURE_CLIENT_SECRET }}" \
-                  --tenant "${{ variables.AZURE_TENANT_ID }}"
-
-                # Export Storage Account Key
-                export ARM_ACCESS_KEY=$(az storage account keys list \
-                  --account-name "${{ variables.STORAGE_ACCOUNT_NAME }}" \
-                  --resource-group "${{ variables.RESOURCE_GROUP_NAME }}" \
-                  --query "[0].value" -o tsv)
-
-                # Initialize Terraform
-                terraform init -backend-config="storage_account_name=${{ variables.STORAGE_ACCOUNT_NAME }}" \
-                               -backend-config="container_name=${{ variables.CONTAINER_NAME }}" \
-                               -backend-config="key=terraform.tfstate" \
-                               -backend-config="access_key=$ARM_ACCESS_KEY" \
-                               -reconfigure
+                # Initialize Terraform with backend configuration
+                terraform init -reconfigure  # Ensure Terraform is configured with the backend correctly
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
-    dependsOn: TerraformInit
     jobs:
       - job: TerraformPlanJob
         displayName: "Run Terraform Plan"
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: '$(azure_subscription)'
+              azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
@@ -101,16 +83,22 @@ stages:
     dependsOn: TerraformPlan
     condition: succeeded()
     jobs:
-      - job: TerraformApplyJob
-        displayName: "Apply Terraform Plan"
-        steps:
-          - download: tfplan
-            artifact: tfplan
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: '$(azure_subscription)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # Apply Terraform Plan
-                terraform apply -auto-approve tfplan
+      - deployment: TerraformApplyJob
+        displayName: "Run Terraform Apply"
+        environment: "ManualApproval"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: tfplan
+                  artifact: tfplan
+                  displayName: "Download Plan Artifact"
+
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: $(azure_subscription)
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Apply the Terraform plan
+                      terraform apply -auto-approve tfplan
