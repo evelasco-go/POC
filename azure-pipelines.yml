@@ -22,7 +22,7 @@ stages:
     steps:
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'Software Development(15e60859-88d7-4c84-943f-55488479910c)'
+        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -61,7 +61,7 @@ stages:
             artifact: tfplan
           - task: AzureCLI@2
             inputs:
-              azureSubscription: 'Software Development(15e60859-88d7-4c84-943f-55488479910c)'
+              azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
