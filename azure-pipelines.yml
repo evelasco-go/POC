@@ -40,9 +40,14 @@ stages:
           # Save the Plan Output in JSON format
           terraform show -json tfplan > tfplan.json
 
-          # Upload the Plan File as an Artifact
-          echo "Uploading plan artifact..."
-          echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan.json"
+          # Ensure tfplan.json is created and upload it as an artifact
+          if [ -f tfplan.json ]; then
+            echo "Uploading plan artifact..."
+            echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan.json"
+          else
+            echo "tfplan.json not found, skipping artifact upload."
+            exit 1
+          fi
 
 # Stage 2: Terraform Apply (with Manual Approval)
 - stage: TerraformApply
