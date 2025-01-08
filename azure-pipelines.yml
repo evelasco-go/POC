@@ -21,29 +21,29 @@ stages:
   - stage: CreateResources
     displayName: "Create Azure Resources"
     jobs:
-    - job: CreateAzureResources
-      displayName: "Create Resource Group and Storage Account"
-      steps:
-      - task: AzureCLI@2
-        inputs:
-          azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-          scriptType: 'bash'
-          scriptLocation: 'inlineScript'
-          inlineScript: |
-            # Create Resource Group
-            az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
+      - job: CreateAzureResources
+        displayName: "Create Resource Group and Storage Account"
+        steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Create Resource Group
+                az group create --name ${{ variables.resource_group_name }} --location ${{ variables.location }}
 
-            # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
-            az storage account create \
-              --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
-              --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
-              --location "East US" \
-              --sku Standard_LRS
+                # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
+                az storage account create \
+                  --name ${{ variables.storage_account_name }} \
+                  --resource-group ${{ variables.resource_group_name }} \
+                  --location ${{ variables.location }} \
+                  --sku Standard_LRS
 
-            # Create a container to store Terraform state
-            az storage container create \
-              --name ${{ variables.CONTAINER_NAME }} \
-              --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
+                # Create a container to store Terraform state
+                az storage container create \
+                  --name ${{ variables.container_name }} \
+                  --account-name ${{ variables.storage_account_name }}
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
@@ -57,11 +57,11 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Authenticate using a Service Principal
+                # Authenticate using Service Principal (assuming the necessary environment variables are set)
                 az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
 
-                # Initialize Terraform
-                terraform init -reconfigure  # Reconfigure the backend configuration
+                # Initialize Terraform with backend configuration
+                terraform init -reconfigure
 
                 # Run Terraform Plan and output it to tfplan
                 terraform plan -out=tfplan
@@ -94,7 +94,7 @@ stages:
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
-                      # Authenticate using a Service Principal
+                      # Authenticate using Service Principal
                       az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
 
                       # Initialize Terraform with backend configuration
