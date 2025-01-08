@@ -11,7 +11,7 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
   resource_group_name: 'POCMyResourceGroup'  # Override if needed
   location: 'East US'                     # Override if needed
-  storage_account_name: 'POCmystorageacct123'  # Override if needed
+  storage_account_name: 'pocmystorageacct123'  # Override if needed
   container_name: 'tfstate'               # Override if needed
   aks_name: 'MyAKSCluster'                # Override if needed
   node_count: 2                           # Override if needed
