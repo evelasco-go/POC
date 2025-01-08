@@ -37,15 +37,16 @@ stages:
           # Run Terraform Plan and output to tfplan file
           terraform plan -out=tfplan
 
-          # Save the Plan Output in JSON format
-          terraform show -json tfplan > tfplan.json
+          # Check if tfplan file was created
+          if [ -f tfplan ]; then
+            # Save the Plan Output in JSON format
+            terraform show -json tfplan > tfplan.json
 
-          # Ensure tfplan.json is created and upload it as an artifact
-          if [ -f tfplan.json ]; then
+            # Upload the Plan File as an Artifact
             echo "Uploading plan artifact..."
             echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan.json"
           else
-            echo "tfplan.json not found, skipping artifact upload."
+            echo "tfplan file not created, skipping artifact upload."
             exit 1
           fi
 
