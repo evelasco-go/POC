@@ -1,5 +1,5 @@
 variable "resource_group_name" {
-  default = "MyResourceGroup"
+  default = "POCMyResourceGroup"
 }
 
 variable "location" {
@@ -7,7 +7,7 @@ variable "location" {
 }
 
 variable "storage_account_name" {
-  default = "mystorageacct123"
+  default = "POCmystorageacct123"
 }
 
 variable "container_name" {
