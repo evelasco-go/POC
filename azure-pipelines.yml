@@ -4,17 +4,19 @@ trigger:
       - dev  # Replace with your branch name
 
 variables:
-  AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
-  AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
-  AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
-  AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
-  azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Your subscription ID
-  RESOURCE_GROUP_NAME: "POCMyResourceGroup"
-  STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
+  azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+  RESOURCE_GROUP_NAME: "MyResourceGroup"
+  STORAGE_ACCOUNT_NAME: "mystorageacct123"
   CONTAINER_NAME: "tfstate"
   LOCATION: "East US"
   NODE_COUNT: 2
   AKS_NAME: "MyAKSCluster"
+  # Hardcode values for debugging
+  AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
+  AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
+  AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
+  AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
+
 
 stages:
   - stage: CreateResources
@@ -25,27 +27,24 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
+              azureSubscription: $(azure_subscription)  # Use the correct service connection
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Authenticate using the Service Principal
-                az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-                
                 # Create Resource Group
-                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
-                
-                # Create Storage Account
+                az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
+
+                # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
                 az storage account create \
-                  --name $(STORAGE_ACCOUNT_NAME) \
-                  --resource-group $(RESOURCE_GROUP_NAME) \
-                  --location $(LOCATION) \
+                  --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
+                  --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
+                  --location "East US" \
                   --sku Standard_LRS
-                
-                # Create a container for Terraform state
+
+                # Create a container to store Terraform state
                 az storage container create \
-                  --name $(CONTAINER_NAME) \
-                  --account-name $(STORAGE_ACCOUNT_NAME)
+                  --name ${{ variables.CONTAINER_NAME }} \
+                  --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
 
   - stage: TerraformInit
     displayName: "Initialize Terraform"
@@ -55,15 +54,12 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
+              azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Authenticate using the Service Principal
-                az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-                
-                # Initialize Terraform
-                terraform init -reconfigure  # Reconfigure the backend
+                # Initialize Terraform with backend configuration
+                terraform init -reconfigure  # Ensure Terraform is configured with the backend correctly
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
@@ -73,13 +69,10 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
+              azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Authenticate using the Service Principal
-                az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-                
                 # Run Terraform Plan
                 terraform plan -out=tfplan
 
@@ -105,12 +98,9 @@ stages:
 
                 - task: AzureCLI@2
                   inputs:
-                    azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
+                    azureSubscription: $(azure_subscription)
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
-                      # Authenticate using the Service Principal
-                      az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-
                       # Apply the Terraform plan
                       terraform apply -auto-approve tfplan
