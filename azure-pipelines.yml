@@ -1,14 +1,10 @@
-
-trigger:
-  branches:
-    include:
-      - dev
+trigger: none
 
 variables:
-  AZURE_CLIENT_ID: $(azure_client_id)
-  AZURE_CLIENT_SECRET: $(azure_client_secret)
-  AZURE_TENANT_ID: $(azure_tenant_id)
-  AZURE_SUBSCRIPTION_ID: $(azure_subscription_id)
+  AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
+  AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
+  AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
+  AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
   azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
   RESOURCE_GROUP_NAME: "MyResourceGroup"
   STORAGE_ACCOUNT_NAME: "mystorageacct123"
@@ -18,82 +14,76 @@ variables:
   AKS_NAME: "MyAKSCluster"
 
 stages:
-  - stage: CreateResources
-    displayName: "Create Azure Resources"
-    jobs:
-      - job: CreateAzureResources
-        displayName: "Create Resource Group and Storage Account"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: '$(azure_subscription)'  # Service Connection Name
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # Create Resource Group
-                az group create --name $RESOURCE_GROUP_NAME --location $LOCATION
+- stage: CreateResources
+  displayName: "Create Azure Resources"
+  jobs:
+  - job: CreateAzureResources
+    displayName: "Create Resource Group and Storage Account"
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: '$(azure_subscription)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Create Resource Group
+          az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location ${{ variables.LOCATION }}
 
-                # Create Storage Account
-                az storage account create \
-                  --name $STORAGE_ACCOUNT_NAME \
-                  --resource-group $RESOURCE_GROUP_NAME \
-                  --location $LOCATION \
-                  --sku Standard_LRS
+          # Create Storage Account
+          az storage account create \
+            --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
+            --location ${{ variables.LOCATION }} \
+            --sku Standard_LRS
 
-                # Create Container
-                az storage container create \
-                  --name $CONTAINER_NAME \
-                  --account-name $STORAGE_ACCOUNT_NAME
+          # Create a container for Terraform state
+          az storage container create \
+            --name ${{ variables.CONTAINER_NAME }} \
+            --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
 
-  - stage: TerraformInit
-    displayName: "Initialize Terraform"
-    dependsOn: CreateResources
-    jobs:
-      - job: TerraformInitJob
-        displayName: "Initialize Terraform Backend"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: '$(azure_subscription)'  # Service Connection Name
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                terraform init -backend-config="storage_account_name=$STORAGE_ACCOUNT_NAME" \
-                               -backend-config="container_name=$CONTAINER_NAME" \
-                               -backend-config="key=terraform.tfstate" \
-                               -backend-config="resource_group_name=$RESOURCE_GROUP_NAME" \
-                               -backend-config="client_id=$AZURE_CLIENT_ID" \
-                               -backend-config="client_secret=$AZURE_CLIENT_SECRET" \
-                               -backend-config="tenant_id=$AZURE_TENANT_ID" \
-                               -backend-config="subscription_id=$AZURE_SUBSCRIPTION_ID"
+- stage: TerraformInit
+  displayName: "Initialize Terraform"
+  jobs:
+    - job: TerraformInitJob
+      displayName: "Terraform Init"
+      steps:
+        - script: |
+            az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
+            terraform init -reconfigure
+          displayName: "Run Terraform Init"
 
-  - stage: TerraformPlan
-    displayName: "Plan Infrastructure"
-    dependsOn: TerraformInit
-    jobs:
-      - job: TerraformPlanJob
-        displayName: "Run Terraform Plan"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: '$(azure_subscription)'  # Service Connection Name
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                terraform plan -out=tfplan
+- stage: TerraformPlan
+  displayName: "Plan Infrastructure"
+  dependsOn: TerraformInit
+  jobs:
+    - job: TerraformPlanJob
+      displayName: "Run Terraform Plan"
+      steps:
+        - script: |
+            az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
+            terraform plan -out=tfplan
+          displayName: "Run Terraform Plan"
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: 'tfplan'
+            artifactName: 'tfplan'
+            publishLocation: 'pipeline'
+          displayName: "Upload Terraform Plan Artifact"
 
-  - stage: TerraformApply
-    displayName: "Apply Infrastructure"
-    dependsOn: TerraformPlan
-    condition: succeeded()
-    jobs:
-      - job: TerraformApplyJob
-        displayName: "Run Terraform Apply"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: '$(azure_subscription)'  # Service Connection Name
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                terraform apply -auto-approve tfplan
+- stage: TerraformApply
+  displayName: "Apply Infrastructure"
+  dependsOn: TerraformPlan
+  condition: succeeded()
+  jobs:
+    - job: TerraformApplyJob
+      displayName: "Run Terraform Apply"
+      steps:
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            artifactName: 'tfplan'
+            targetPath: '$(Pipeline.Workspace)/tfplan'
+          displayName: "Download Terraform Plan Artifact"
+        - script: |
+            az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
+            terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
+          displayName: "Run Terraform Apply"
