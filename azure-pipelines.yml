@@ -25,24 +25,27 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: $(azure_subscription)  # Use the correct service connection
+              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                # Authenticate using the Service Principal
+                az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+                
                 # Create Resource Group
-                az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
-
-                # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
+                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
+                
+                # Create Storage Account
                 az storage account create \
-                  --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
-                  --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
-                  --location "East US" \
+                  --name $(STORAGE_ACCOUNT_NAME) \
+                  --resource-group $(RESOURCE_GROUP_NAME) \
+                  --location $(LOCATION) \
                   --sku Standard_LRS
-
-                # Create a container to store Terraform state
+                
+                # Create a container for Terraform state
                 az storage container create \
-                  --name ${{ variables.CONTAINER_NAME }} \
-                  --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
+                  --name $(CONTAINER_NAME) \
+                  --account-name $(STORAGE_ACCOUNT_NAME)
 
   - stage: TerraformInit
     displayName: "Initialize Terraform"
@@ -52,12 +55,15 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: $(azure_subscription)
+              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Initialize Terraform with backend configuration
-                terraform init -reconfigure  # Ensure Terraform is configured with the backend correctly
+                # Authenticate using the Service Principal
+                az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+                
+                # Initialize Terraform
+                terraform init -reconfigure  # Reconfigure the backend
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
@@ -67,10 +73,13 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: $(azure_subscription)
+              azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                # Authenticate using the Service Principal
+                az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+                
                 # Run Terraform Plan
                 terraform plan -out=tfplan
 
@@ -96,9 +105,12 @@ stages:
 
                 - task: AzureCLI@2
                   inputs:
-                    azureSubscription: $(azure_subscription)
+                    azureSubscription: '$(azure_subscription)'  # The Azure subscription to use
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
+                      # Authenticate using the Service Principal
+                      az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+
                       # Apply the Terraform plan
                       terraform apply -auto-approve tfplan
