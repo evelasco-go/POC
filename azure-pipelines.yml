@@ -18,87 +18,93 @@ variables:
 
 
 stages:
-- stage: CreateResources
-  displayName: "Create Azure Resources"
-  jobs:
-  - job: CreateAzureResources
-    displayName: "Create Resource Group and Storage Account"
-    steps:
-    - task: AzureCLI@2
-      inputs:
-        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          # Create Resource Group
-          az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
+  - stage: CreateResources
+    displayName: "Create Azure Resources"
+    jobs:
+    - job: CreateAzureResources
+      displayName: "Create Resource Group and Storage Account"
+      steps:
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+          inlineScript: |
+            # Create Resource Group
+            az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
 
-          # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
-          az storage account create \
-            --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
-            --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
-            --location "East US" \
-            --sku Standard_LRS
+            # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
+            az storage account create \
+              --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
+              --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
+              --location "East US" \
+              --sku Standard_LRS
 
-          # Create a container to store Terraform state
-          az storage container create \
-            --name ${{ variables.CONTAINER_NAME }} \
-            --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
+            # Create a container to store Terraform state
+            az storage container create \
+              --name ${{ variables.CONTAINER_NAME }} \
+              --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
 
-# Stage 1: Terraform Plan
-- stage: TerraformPlan
-  displayName: "Plan Infrastructure"
-  jobs:
-  - job: TerraformPlan
-    displayName: "Run Terraform Plan"
-    steps:
-    - task: AzureCLI@2
-      inputs:
-        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          # Initialize Terraform with backend configuration
-          terraform init -reconfigure
-
-          # Run Terraform Plan and save it as tfplan
-          terraform plan -out=tfplan
-
-          # Upload the plan artifact
-          echo "Uploading plan artifact..."
-          echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
-
-# Stage 2: Terraform Apply (with Manual Approval)
-- stage: TerraformApply
-  displayName: "Apply Infrastructure"
-  dependsOn: TerraformPlan
-  condition: succeeded()
-  jobs:
-  - deployment: TerraformApply
-    displayName: "Run Terraform Apply"
-    environment: "ManualApproval"
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: tfplan
-            artifact: tfplan
-            displayName: "Download Plan Artifact"
-
+  - stage: TerraformPlan
+    displayName: "Plan Infrastructure"
+    jobs:
+      - job: TerraformPlan
+        displayName: "Run Terraform Plan"
+        steps:
           - task: AzureCLI@2
             inputs:
               azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Initialize Terraform with backend configuration
-                terraform init -reconfigure
+                # Authenticate using a Service Principal
+                az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
 
-                # Ensure the tfplan file exists before applying
-                if [ ! -f tfplan ]; then
-                  echo "Error: Plan file not found. Apply aborted."
-                  exit 1
-                fi
+                # Initialize Terraform
+                terraform init -reconfigure  # Reconfigure the backend configuration
 
-                # Apply Terraform Plan
-                terraform apply -auto-approve tfplan
+                # Run Terraform Plan and output it to tfplan
+                terraform plan -out=tfplan
+
+                # Upload the plan as an artifact
+                echo "Uploading plan artifact..."
+                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
+
+  - stage: TerraformApply
+    displayName: "Apply Infrastructure"
+    dependsOn: TerraformPlan
+    condition: succeeded()
+    jobs:
+      - deployment: TerraformApply
+        displayName: "Run Terraform Apply"
+        environment: "ManualApproval"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Download the Terraform plan artifact
+                - download: tfplan
+                  artifact: tfplan
+                  displayName: "Download Plan Artifact"
+
+                # Apply the Terraform plan
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Authenticate using a Service Principal
+                      az login --service-principal -u ${{ variables.AZURE_CLIENT_ID }} -p ${{ variables.AZURE_CLIENT_SECRET }} --tenant ${{ variables.AZURE_TENANT_ID }}
+
+                      # Initialize Terraform with backend configuration
+                      terraform init -reconfigure
+
+                      # Ensure tfplan exists
+                      if [ ! -f tfplan ]; then
+                        echo "Error: Plan file not found. Aborting."
+                        exit 1
+                      fi
+
+                      # Apply the Terraform plan
+                      terraform apply -auto-approve tfplan
