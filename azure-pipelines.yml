@@ -17,15 +17,43 @@ variables:
   node_count: 2                           # Override if needed
 
 stages:
+- stage: CreateResources
+  displayName: "Create Azure Resources"
+  jobs:
+  - job: CreateAzureResources
+    displayName: "Create Resource Group and Storage Account"
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Create Resource Group
+          az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
+
+          # Create Storage Account
+          az storage account create \
+            --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
+            --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
+            --location "East US" \
+            --sku Standard_LRS
+
+          # Create a container to store Terraform state
+          az storage container create \
+            --name ${{ variables.CONTAINER_NAME }} \
+            --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
+
 - stage: TerraformPlan
   displayName: "Plan Infrastructure"
+  dependsOn: CreateResources
   jobs:
   - job: TerraformPlan
     displayName: "Run Terraform Plan"
     steps:
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Azure subscription
+        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -40,8 +68,12 @@ stages:
           export ARM_TENANT_ID=${{ variables.AZURE_TENANT_ID }}
           export ARM_SUBSCRIPTION_ID=${{ variables.AZURE_SUBSCRIPTION_ID }}
 
-          # Initialize Terraform with backend configuration
-          terraform init -reconfigure
+          # Initialize Terraform backend
+          terraform init \
+            -backend-config="resource_group_name=${{ variables.RESOURCE_GROUP_NAME }}" \
+            -backend-config="storage_account_name=${{ variables.STORAGE_ACCOUNT_NAME }}" \
+            -backend-config="container_name=${{ variables.CONTAINER_NAME }}" \
+            -backend-config="key=terraform.tfstate"
 
           # Run Terraform Plan and output to tfplan file
           terraform plan -out=tfplan
@@ -87,7 +119,11 @@ stages:
                 export ARM_SUBSCRIPTION_ID=${{ variables.AZURE_SUBSCRIPTION_ID }}
 
                 # Initialize Terraform with backend configuration (reconfigure to change backend if needed)
-                terraform init -reconfigure
+                terraform init \
+                  -backend-config="resource_group_name=${{ variables.RESOURCE_GROUP_NAME }}" \
+                  -backend-config="storage_account_name=${{ variables.STORAGE_ACCOUNT_NAME }}" \
+                  -backend-config="container_name=${{ variables.CONTAINER_NAME }}" \
+                  -backend-config="key=terraform.tfstate"
 
                 # Apply Terraform Plan
                 terraform apply -auto-approve tfplan
