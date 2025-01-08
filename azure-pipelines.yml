@@ -9,8 +9,8 @@ variables:
   AZURE_TENANT_ID: "<your-tenant-id>" # Replace with actual value
   AZURE_SUBSCRIPTION_ID: "<your-subscription-id>" # Replace with actual value
   azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)' # Service connection name
-  RESOURCE_GROUP_NAME: "MyResourceGroup"
-  STORAGE_ACCOUNT_NAME: "mystorageacct123"
+  RESOURCE_GROUP_NAME: "POCMyResourceGroup"
+  STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
   CONTAINER_NAME: "tfstate"
   LOCATION: "West US"
   NODE_COUNT: 2
