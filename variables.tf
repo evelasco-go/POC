@@ -7,7 +7,7 @@ variable "location" {
 }
 
 variable "storage_account_name" {
-  default = "POCmystorageacct123"
+  default = "pocmystorageacct123"
 }
 
 variable "container_name" {
