@@ -34,15 +34,18 @@ stages:
           # Initialize Terraform with backend configuration (reconfigure to change backend if needed)
           terraform init -reconfigure
 
-          # Run Terraform Plan and output to tfplan file
-          terraform plan -out=tfplan
+          # Run Terraform Plan with detailed exit code (detect changes)
+          terraform plan -detailed-exitcode -out=tfplan
 
-          # Save the Plan Output in JSON format
-          terraform show -json tfplan > tfplan.json
-
-          # Upload the Plan File as an Artifact
-          echo "Uploading plan artifact..."
-          echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan.json"
+          # Check if there are changes (code 2 means changes, 0 means no changes)
+          if [ $? -eq 2 ]; then
+            echo "Changes detected, uploading plan artifact..."
+            terraform show -json tfplan > tfplan.json
+            echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan.json"
+          else
+            echo "No changes detected, skipping Terraform apply."
+            exit 0  # Exit early as there are no changes
+          fi
 
 # Stage 2: Terraform Apply (with Manual Approval)
 - stage: TerraformApply
@@ -75,5 +78,5 @@ stages:
                 # Initialize Terraform with backend configuration (reconfigure to change backend if needed)
                 terraform init -reconfigure
 
-                # Apply Terraform Plan
+                # Apply Terraform Plan only if changes were detected
                 terraform apply -auto-approve tfplan
