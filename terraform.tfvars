@@ -1,0 +1,10 @@
+azure_subscription_id = "your-subscription-id"
+azure_client_id       = "your-client-id"
+azure_client_secret   = "your-client-secret"
+azure_tenant_id       = "your-tenant-id"
+resource_group_name   = "MyResourceGroup"
+storage_account_name  = "mystorageacct123"
+container_name        = "tfstate"
+aks_name              = "MyAKSCluster"
+node_count            = 2
+location              = "East US"
