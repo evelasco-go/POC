@@ -22,22 +22,22 @@ stages:
     steps:
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+        azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Use the correct Azure subscription ID
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
           # Install Terraform
           curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
-          apt-get update && apt-get install -y terraform
+          sudo apt-get update && sudo apt-get install -y terraform
 
-          # Initialize Terraform
-          terraform init
+          # Initialize Terraform with backend configuration (reconfigure to change backend if needed)
+          terraform init -reconfigure
 
-          # Run Terraform Plan
+          # Run Terraform Plan and output to tfplan file
           terraform plan -out=tfplan
 
-          # Save the Plan Output
+          # Save the Plan Output in JSON format
           terraform show -json tfplan > tfplan.json
 
           # Upload the Plan File as an Artifact
@@ -52,26 +52,28 @@ stages:
   jobs:
   - deployment: TerraformApply
     displayName: "Run Terraform Apply"
-    environment: "ManualApproval"
+    environment: "ManualApproval"  # Define manual approval environment
     strategy:
       runOnce:
         deploy:
           steps:
           - download: tfplan
             artifact: tfplan
+            displayName: "Download Plan Artifact"
+
           - task: AzureCLI@2
             inputs:
-              azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+              azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Use the correct Azure subscription ID
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
                 # Install Terraform
                 curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
                 echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
-                apt-get update && apt-get install -y terraform
+                sudo apt-get update && sudo apt-get install -y terraform
 
-                # Initialize Terraform
-                terraform init
+                # Initialize Terraform with backend configuration (reconfigure to change backend if needed)
+                terraform init -reconfigure
 
                 # Apply Terraform Plan
                 terraform apply -auto-approve tfplan
