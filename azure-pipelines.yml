@@ -45,11 +45,11 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  - stage: TerraformInitAndPlan
-    displayName: "Initialize and Plan Terraform"
+  - stage: TerraformInitPlanAndApply
+    displayName: "Initialize, Plan and Apply Terraform"
     jobs:
-      - job: TerraformInitAndPlanJob
-        displayName: "Terraform Init and Plan"
+      - job: TerraformInitPlanAndApplyJob
+        displayName: "Terraform Init, Plan, and Apply"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -63,7 +63,7 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Ensure terraform init with explicit backend config
+                # Initialize Terraform with explicit backend config
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
@@ -73,35 +73,12 @@ stages:
                 # Run Terraform Plan
                 terraform plan -out=./tfplan
 
-                # Ensure the tfplan file exists and upload as an artifact
+                # Check if the tfplan file exists
                 if [ -f "./tfplan" ]; then
-                  echo "Terraform plan file exists. Uploading..."
-                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+                  echo "Terraform plan file exists. Proceeding to apply..."
+                  # Apply the Terraform plan to provision resources
+                  terraform apply -auto-approve ./tfplan
                 else
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
                 fi
-
-  - stage: TerraformApply
-    displayName: "Apply Infrastructure"
-    dependsOn: TerraformInitAndPlan
-    condition: succeeded()
-    jobs:
-      - deployment: TerraformApplyJob
-        displayName: "Run Terraform Apply"
-        environment: "ManualApproval"
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: tfplan
-                  artifact: tfplan
-
-                - task: AzureCLI@2
-                  inputs:
-                    azureSubscription: $(azure_subscription)
-                    scriptType: 'bash'
-                    scriptLocation: 'inlineScript'
-                    inlineScript: |
-                      # Apply the tfplan file to provision resources
-                      terraform apply -auto-approve tfplan
