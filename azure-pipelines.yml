@@ -73,13 +73,8 @@ stages:
                 # Run Terraform Plan
                 terraform plan -out=./tfplan
 
-                # Check if the tfplan file exists and upload as artifact
-                if [ -f "./tfplan" ]; then
-                  echo "Terraform plan file exists. Uploading..."
-                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
-                else
-                  echo "Terraform plan file does not exist. Exiting."
-                  exit 1
+                # Upload the plan file as artifact
+                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
@@ -100,10 +95,5 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Check if the tfplan file is downloaded
-                if [ -f "$(Pipeline.Workspace)/tfplan" ]; then
-                  echo "Applying Terraform plan..."
-                  terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan"
-                else
-                  echo "tfplan file is missing. Exiting."
-                  exit 1
+                # Apply the terraform plan
+                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
