@@ -57,14 +57,18 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Explicitly setting environment variables for Terraform
+                # Set environment variables for Terraform
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform with reconfiguration
-                terraform init -reconfigure
+                # Ensure terraform init with explicit backend config
+                terraform init -reconfigure \
+                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                  -backend-config="container_name=$(CONTAINER_NAME)" \
+                  -backend-config="key=terraform.tfstate"
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
@@ -81,13 +85,13 @@ stages:
                 # Run Terraform Plan
                 terraform plan -out=tfplan
 
-                # Check if the plan file was created successfully
+                # Ensure the tfplan file exists and upload as an artifact
                 if [ ! -f "tfplan" ]; then
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
                 fi
 
-                # Upload plan artifact
+                # Upload the tfplan artifact for later use in apply stage
                 echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
 
   - stage: TerraformApply
@@ -111,4 +115,5 @@ stages:
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
+                      # Apply the tfplan file to provision resources
                       terraform apply -auto-approve tfplan
