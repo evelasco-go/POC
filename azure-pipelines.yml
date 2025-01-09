@@ -74,13 +74,13 @@ stages:
                 terraform plan -out=tfplan
 
                 # Ensure the tfplan file exists and upload as an artifact
-                if [ ! -f "tfplan" ]; then
+                if [ -f "tfplan" ]; then
+                  echo "Terraform plan file exists. Uploading..."
+                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
+                else
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
                 fi
-
-                # Upload the tfplan artifact for later use in apply stage
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
