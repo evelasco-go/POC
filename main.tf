@@ -17,10 +17,10 @@ terraform {
 provider "azurerm" {
   features {}
 
-  subscription_id = "your-subscription-id"  # Replace with your Azure Subscription ID
-  client_id       = "your-client-id"        # Replace with your Azure Client ID
-  client_secret   = "your-client-secret"    # Replace with your Azure Client Secret
-  tenant_id       = "your-tenant-id"        # Replace with your Azure Tenant ID
+  azure_subscription_id = "15e60859-88d7-4c84-943f-55488479910c"
+  azure_client_id       = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  azure_client_secret   = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id       = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
 }
 
 # Resource Group
