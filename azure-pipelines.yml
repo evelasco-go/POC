@@ -87,7 +87,7 @@ stages:
           - task: DownloadPipelineArtifact@2
             inputs:
               artifactName: tfplan
-              downloadPath: $(Pipeline.Workspace)/tfplan
+              downloadPath: $(Pipeline.Workspace)
 
           - task: AzureCLI@2
             inputs:
@@ -95,5 +95,8 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                # Change to the directory containing the plan
+                cd $(Pipeline.Workspace)
+
                 # Apply the terraform plan
-                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
+                terraform apply -auto-approve ./tfplan
