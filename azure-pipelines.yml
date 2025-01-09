@@ -45,11 +45,11 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  - stage: TerraformInitAndApply
-    displayName: "Initialize, Import and Apply Terraform"
+  - stage: TerraformInitAndPlan
+    displayName: "Initialize and Plan Terraform"
     jobs:
-      - job: TerraformInitAndApplyJob
-        displayName: "Terraform Init, Import and Apply"
+      - job: TerraformInitAndPlanJob
+        displayName: "Terraform Init and Plan"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -63,31 +63,27 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform with explicit backend config
+                # Ensure terraform init with explicit backend config
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Import the existing resource group into Terraform state
-                terraform import azurerm_resource_group.rg /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)
-
                 # Run Terraform Plan
                 terraform plan -out=./tfplan
 
-                # Ensure the tfplan file exists and upload as an artifact
+                # Validate the tfplan file exists before proceeding
                 if [ -f "./tfplan" ]; then
-                  echo "Terraform plan file exists. Uploading..."
-                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+                  echo "Terraform plan file exists. Proceeding..."
                 else
-                  echo "Terraform plan file does not exist. Exiting."
+                  echo "Terraform plan file does not exist! Exiting."
                   exit 1
                 fi
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
-    dependsOn: TerraformInitAndApply
+    dependsOn: TerraformInitAndPlan
     condition: succeeded()
     jobs:
       - deployment: TerraformApplyJob
@@ -106,5 +102,25 @@ stages:
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
-                      # Apply the tfplan file to provision resources
+                      # Set Terraform debug environment variable to get detailed logs
+                      export TF_LOG=DEBUG
+                      export TF_LOG_PATH=terraform-debug.log
+
+                      # Apply the terraform plan file
                       terraform apply -auto-approve tfplan
+
+                      # Check if the log file is created and display it
+                      if [ -f terraform-debug.log ]; then
+                        cat terraform-debug.log
+                      else
+                        echo "Terraform debug log not found!"
+                        exit 1
+                      fi
+
+                      # Verify if apply was successful
+                      if [ $? -eq 0 ]; then
+                        echo "Terraform apply succeeded!"
+                      else
+                        echo "Terraform apply failed!"
+                        exit 1
+                      fi
