@@ -73,7 +73,7 @@ stages:
                 # Run Terraform Plan
                 terraform plan -out=./tfplan
 
-                # Check if the plan was created and upload as artifact
+                # Ensure the tfplan file exists and upload as artifact
                 if [ -f "./tfplan" ]; then
                   echo "Terraform plan file exists. Uploading..."
                   echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
@@ -103,7 +103,7 @@ stages:
                 # Debug output for downloaded artifact path
                 echo "Artifact downloaded to $(Pipeline.Workspace)/tfplan"
 
-                # Apply the tfplan file to provision resources
+                # Check if the tfplan file exists
                 if [ -f "$(Pipeline.Workspace)/tfplan" ]; then
                   echo "Applying Terraform plan..."
                   terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan"
