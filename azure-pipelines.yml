@@ -63,7 +63,7 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Ensure terraform init with explicit backend config
+                # Initialize terraform with backend config
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
@@ -73,7 +73,7 @@ stages:
                 # Run Terraform Plan
                 terraform plan -out=./tfplan
 
-                # Ensure the tfplan file exists and upload as artifact
+                # Check if the tfplan file exists and upload as artifact
                 if [ -f "./tfplan" ]; then
                   echo "Terraform plan file exists. Uploading..."
                   echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
@@ -100,10 +100,7 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Debug output for downloaded artifact path
-                echo "Artifact downloaded to $(Pipeline.Workspace)/tfplan"
-
-                # Check if the tfplan file exists
+                # Check if the tfplan file is downloaded
                 if [ -f "$(Pipeline.Workspace)/tfplan" ]; then
                   echo "Applying Terraform plan..."
                   terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan"
