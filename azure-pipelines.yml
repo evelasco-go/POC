@@ -71,16 +71,15 @@ stages:
                   -backend-config="key=terraform.tfstate"
 
                 # Run Terraform Plan
-                terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
+                terraform plan -out=./tfplan
 
                 # Ensure the tfplan file exists and upload as an artifact
-                if [ -f "$(Build.ArtifactStagingDirectory)/tfplan" ]; then
+                if [ -f "./tfplan" ]; then
                   echo "Terraform plan file exists. Uploading..."
-                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(Build.ArtifactStagingDirectory)/tfplan"
+                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
                 else
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
-                fi
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
@@ -90,8 +89,10 @@ stages:
       - job: TerraformApplyJob
         displayName: "Run Terraform Apply"
         steps:
-          - download: current
-            artifact: tfplan
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifactName: tfplan
+              downloadPath: $(Pipeline.Workspace)/tfplan
 
           - task: AzureCLI@2
             inputs:
@@ -99,10 +100,5 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Verify if tfplan file exists
-                if [ -f "$(Pipeline.Workspace)/tfplan/tfplan" ]; then
-                  echo "Applying the Terraform plan..."
-                  terraform apply -auto-approve $(Pipeline.Workspace)/tfplan/tfplan
-                else
-                  echo "Terraform plan file does not exist. Exiting."
-                  exit 1
+                # Apply the tfplan file to provision resources
+                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
