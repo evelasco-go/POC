@@ -6,6 +6,13 @@ terraform {
     container_name       = "tfstate"
     key                  = "terraform.tfstate"
   }
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"  # Specify provider version for compatibility
+    }
+  }
 }
 
 # Provider Configuration
