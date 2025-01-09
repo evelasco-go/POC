@@ -18,6 +18,33 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
+  - stage: CreateResources
+    displayName: "Create Azure Resources"
+    jobs:
+      - job: CreateAzureResources
+        displayName: "Create Resource Group and Storage Account"
+        steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azure_subscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Create Resource Group
+                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
+
+                # Create Storage Account
+                az storage account create \
+                  --name $(STORAGE_ACCOUNT_NAME) \
+                  --resource-group $(RESOURCE_GROUP_NAME) \
+                  --location $(LOCATION) \
+                  --sku Standard_LRS
+
+                # Create Storage Container
+                az storage container create \
+                  --name $(CONTAINER_NAME) \
+                  --account-name $(STORAGE_ACCOUNT_NAME)
+
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
     jobs:
@@ -36,9 +63,9 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Remove old tfplan and .terraform.lock.hcl if they exist
-                rm -f ./tfplan
+                # Ensure no existing tfplan or lock file
                 rm -f .terraform.lock.hcl
+                rm -f ./tfplan
 
                 # Re-initialize Terraform to fetch the correct provider versions
                 terraform init -reconfigure \
@@ -54,25 +81,32 @@ stages:
                 echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
   - stage: TerraformApply
-    displayName: "Apply Terraform"
+    displayName: "Apply Infrastructure"
+    dependsOn: TerraformInitAndPlan
+    condition: succeeded()
     jobs:
       - job: TerraformApplyJob
-        displayName: "Terraform Apply"
+        displayName: "Run Terraform Apply"
         steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifactName: tfplan
+              downloadPath: $(Pipeline.Workspace)
+
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                # Change to the directory containing the plan
+                cd $(Pipeline.Workspace)
+
                 # Set environment variables for Terraform Service Principal authentication
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Download the plan file artifact
-                echo "##vso[artifact.download artifactname=tfplan;containerfolder=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
-
                 # Apply the Terraform plan
-                terraform apply "./tfplan"
+                terraform apply -auto-approve ./tfplan
