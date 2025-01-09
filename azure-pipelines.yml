@@ -71,12 +71,12 @@ stages:
                   -backend-config="key=terraform.tfstate"
 
                 # Run Terraform Plan
-                terraform plan -out=tfplan
+                terraform plan -out=./tfplan
 
                 # Ensure the tfplan file exists and upload as an artifact
-                if [ -f "tfplan" ]; then
+                if [ -f "./tfplan" ]; then
                   echo "Terraform plan file exists. Uploading..."
-                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
+                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
                 else
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
