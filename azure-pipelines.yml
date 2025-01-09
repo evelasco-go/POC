@@ -23,7 +23,6 @@ stages:
     jobs:
       - job: CreateAzureResources
         displayName: "Create Resource Group and Storage Account"
-        timeoutInMinutes: 30
         steps:
           - task: AzureCLI@2
             inputs:
@@ -51,7 +50,6 @@ stages:
     jobs:
       - job: TerraformInitAndPlanJob
         displayName: "Terraform Init and Plan"
-        timeoutInMinutes: 30
         steps:
           - task: AzureCLI@2
             inputs:
@@ -65,7 +63,7 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform with backend config
+                # Ensure terraform init with explicit backend config
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
@@ -73,10 +71,10 @@ stages:
                   -backend-config="key=terraform.tfstate"
 
                 # Run Terraform Plan
-                terraform plan -out=./tfplan
+                terraform plan -out=$(System.DefaultWorkingDirectory)/tfplan
 
-                # Ensure the tfplan file exists and upload it as an artifact
-                if [ -f "./tfplan" ]; then
+                # Ensure the tfplan file exists and upload as an artifact
+                if [ -f "$(System.DefaultWorkingDirectory)/tfplan" ]; then
                   echo "Terraform plan file exists. Uploading..."
                   echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
                 else
@@ -91,9 +89,8 @@ stages:
     jobs:
       - job: TerraformApplyJob
         displayName: "Run Terraform Apply"
-        timeoutInMinutes: 30
         steps:
-          - download: tfplan
+          - download: current
             artifact: tfplan
 
           - task: AzureCLI@2
@@ -102,25 +99,5 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Set Terraform debug environment variable to get detailed logs
-                export TF_LOG=DEBUG
-                export TF_LOG_PATH=terraform-debug.log
-
-                # Apply the terraform plan file
-                terraform apply -auto-approve tfplan || { echo "Terraform apply failed! Check the logs for more details"; exit 1; }
-
-                # Check if the log file is created and display it
-                if [ -f terraform-debug.log ]; then
-                  cat terraform-debug.log
-                else
-                  echo "Terraform debug log not found!"
-                  exit 1
-                fi
-
-                # Verify if apply was successful
-                if [ $? -eq 0 ]; then
-                  echo "Terraform apply succeeded!"
-                else
-                  echo "Terraform apply failed!"
-                  exit 1
-                fi
+                # Apply the tfplan file to provision resources
+                terraform apply -auto-approve $(System.DefaultWorkingDirectory)/tfplan
