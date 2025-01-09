@@ -99,5 +99,10 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Apply the tfplan file to provision resources
-                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
+                # Verify if tfplan file exists
+                if [ -f "$(Pipeline.Workspace)/tfplan/tfplan" ]; then
+                  echo "Applying the Terraform plan..."
+                  terraform apply -auto-approve $(Pipeline.Workspace)/tfplan/tfplan
+                else
+                  echo "Terraform plan file does not exist. Exiting."
+                  exit 1
