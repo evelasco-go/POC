@@ -18,80 +18,42 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
+# Stage 1: Terraform Init and Apply
+- stage: TerraformDeployment
+  displayName: "Terraform Init and Apply"
+  jobs:
+    - job: TerraformJob
+      displayName: "Run Terraform"
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+        # Checkout the repository
+        - task: Checkout@1
 
-  # Stage 1: Create Azure Resources
-  - stage: CreateResources
-    displayName: "Create Azure Resources"
-    jobs:
-      - job: CreateAzureResources
-        displayName: "Create Resource Group and Storage Account"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
-                az storage account create \
-                  --name $(STORAGE_ACCOUNT_NAME) \
-                  --resource-group $(RESOURCE_GROUP_NAME) \
-                  --location $(LOCATION) \
-                  --sku Standard_LRS
-                az storage container create \
-                  --name $(CONTAINER_NAME) \
-                  --account-name $(STORAGE_ACCOUNT_NAME)
+        # Install Terraform
+        - task: TerraformInstaller@0
+          inputs:
+            terraformVersion: '1.5.0'
 
-  # Stage 2: Terraform Init and Plan
-  - stage: TerraformInitAndPlan
-    displayName: "Initialize and Plan Terraform"
-    dependsOn: CreateResources
-    jobs:
-      - job: TerraformInitAndPlanJob
-        displayName: "Terraform Init and Plan"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                rm -rf .terraform .terraform.lock.hcl
-                rm -f ./tfplan
-                terraform init -upgrade \
-                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                  -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
-                terraform plan -out=./tfplan
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+        # Run Terraform Commands
+        - script: |
+            # Set Azure authentication environment variables
+            export ARM_CLIENT_ID="9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+            export ARM_CLIENT_SECRET="s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+            export ARM_TENANT_ID="fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
+            export ARM_SUBSCRIPTION_ID="15e60859-88d7-4c84-943f-55488479910c"
 
-  # Stage 3: Terraform Apply
-  - stage: TerraformApply
-    displayName: "Apply Terraform Plan"
-    dependsOn: TerraformInitAndPlan
-    condition: succeeded()
-    jobs:
-      - job: TerraformApplyJob
-        displayName: "Apply Terraform"
-        steps:
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifactName: tfplan
-              downloadPath: $(Pipeline.Workspace)
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                cd $(Pipeline.Workspace)
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                terraform apply -auto-approve ./tfplan
+            # Remove any previous state or lock file issues
+            rm -rf .terraform .terraform.lock.hcl tfplan
+
+            # Initialize Terraform
+            terraform init -upgrade \
+              -backend-config="resource_group_name=POCMyResourceGroup" \
+              -backend-config="storage_account_name=pocmystorageacct123" \
+              -backend-config="container_name=tfstate" \
+              -backend-config="key=terraform.tfstate"
+
+            # Plan and Apply Terraform
+            terraform plan -out=tfplan
+            terraform apply -auto-approve tfplan
+          displayName: "Run Terraform Init, Plan, and Apply"
