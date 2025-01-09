@@ -70,6 +70,12 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
+                # Remove old lock file if it exists
+                rm -f .terraform.lock.hcl
+
+                # Re-initialize to download correct provider version
+                terraform init
+
                 # Run Terraform Plan
                 terraform plan -out=./tfplan
 
