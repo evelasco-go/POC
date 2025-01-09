@@ -51,9 +51,9 @@ stages:
       - job: TerraformInitAndPlanJob
         displayName: "Terraform Init and Plan"
         steps:
-          - task: TerraformInstaller@0  # Install a specific version of Terraform
+          - task: TerraformInstaller@0  # Ensure specific version of Terraform is installed
             inputs:
-              terraformVersion: '1.10.3'  # Make sure this is the version of your plan file
+              terraformVersion: '1.10.3'  # Ensure version consistency
 
           - task: AzureCLI@2
             inputs:
@@ -68,10 +68,10 @@ stages:
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
                 # Ensure no existing tfplan or lock file
-                rm -f .terraform.lock.hcl
-                rm -f ./tfplan
+                rm -f .terraform.lock.hcl  # Remove lock file to regenerate it
+                rm -f ./tfplan  # Remove old plan file
 
-                # Re-initialize Terraform to fetch the correct provider versions
+                # Re-initialize Terraform and fetch the correct provider versions
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
@@ -99,7 +99,7 @@ stages:
 
           - task: TerraformInstaller@0  # Ensure same version for apply
             inputs:
-              terraformVersion: '1.10.3'  # Match the version of your plan file
+              terraformVersion: '1.10.3'  # Ensure version consistency
 
           - task: AzureCLI@2
             inputs:
