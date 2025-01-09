@@ -99,4 +99,4 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
                 terraform init
-                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
+                terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan/tfplan"
