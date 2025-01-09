@@ -79,6 +79,12 @@ stages:
               inlineScript: |
                 terraform plan -out=tfplan
 
+                # Ensure the plan is created before uploading it as an artifact
+                if [ ! -f "tfplan" ]; then
+                  echo "Terraform plan file does not exist. Exiting."
+                  exit 1
+                fi
+
                 # Upload plan artifact
                 echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
 
