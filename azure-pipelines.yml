@@ -100,4 +100,4 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 # Apply the tfplan file to provision resources
-                terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/tfplan
+                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
