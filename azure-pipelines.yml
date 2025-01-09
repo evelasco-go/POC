@@ -8,7 +8,7 @@ variables:
   RESOURCE_GROUP_NAME: "POCMyResourceGroup"
   STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
   CONTAINER_NAME: "tfstate"
-  LOCATION: "East US"
+  LOCATION: "eastus"
   NODE_COUNT: 2
   AKS_NAME: "MyAKSCluster"
   # Hardcode values for debugging
