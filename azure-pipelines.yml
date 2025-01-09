@@ -42,7 +42,7 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  # Stage 2: Terraform Init and Plan
+  # Stage 2: Terraform Init, Cleanup Lock File and Plan
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
     dependsOn: CreateResources
@@ -50,25 +50,41 @@ stages:
       - job: TerraformInitAndPlanJob
         displayName: "Terraform Init and Plan"
         steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                rm -rf .terraform .terraform.lock.hcl
-                rm -f ./tfplan
-                terraform init -upgrade \
-                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                  -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
-                terraform plan -out=./tfplan
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+          # Step 1: Install Terraform
+          - script: |
+              echo "Installing Terraform..."
+              curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+              unzip terraform_1.5.7_linux_amd64.zip
+              sudo mv terraform /usr/local/bin/
+              terraform version
+            displayName: "Install Terraform"
+
+          # Step 2: Cleanup .terraform.lock.hcl
+          - script: |
+              cd $(System.DefaultWorkingDirectory)
+              if [ -f ".terraform.lock.hcl" ]; then
+                echo "Removing .terraform.lock.hcl"
+                rm -f .terraform.lock.hcl
+              else
+                echo ".terraform.lock.hcl not found, skipping."
+              fi
+            displayName: "Remove Terraform Lock File"
+
+          # Step 3: Initialize Terraform and Plan
+          - script: |
+              cd $(System.DefaultWorkingDirectory)
+              export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+              export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+              export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+              export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+              terraform init -upgrade \
+                -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                -backend-config="container_name=$(CONTAINER_NAME)" \
+                -backend-config="key=terraform.tfstate"
+              terraform plan -out=./tfplan
+              echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+            displayName: "Terraform Init and Plan"
 
   # Stage 3: Terraform Apply
   - stage: TerraformApply
@@ -79,19 +95,18 @@ stages:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
+          # Step 1: Download Terraform Plan Artifact
           - task: DownloadPipelineArtifact@2
             inputs:
               artifactName: tfplan
               downloadPath: $(Pipeline.Workspace)
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                cd $(Pipeline.Workspace)
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                terraform apply -auto-approve ./tfplan
+
+          # Step 2: Apply Terraform Plan
+          - script: |
+              cd $(Pipeline.Workspace)
+              export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+              export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+              export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+              export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+              terraform apply -auto-approve ./tfplan
+            displayName: "Apply Terraform Plan"
