@@ -45,11 +45,11 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  - stage: TerraformInit
-    displayName: "Initialize Terraform"
+  - stage: TerraformInitAndPlan
+    displayName: "Initialize and Plan Terraform"
     jobs:
-      - job: TerraformInitJob
-        displayName: "Terraform Init"
+      - job: TerraformInitAndPlanJob
+        displayName: "Terraform Init and Plan"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -70,18 +70,6 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-  - stage: TerraformPlan
-    displayName: "Plan Infrastructure"
-    jobs:
-      - job: TerraformPlanJob
-        displayName: "Run Terraform Plan"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
                 # Run Terraform Plan
                 terraform plan -out=tfplan
 
@@ -96,7 +84,7 @@ stages:
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
-    dependsOn: TerraformPlan
+    dependsOn: TerraformInitAndPlan
     condition: succeeded()
     jobs:
       - deployment: TerraformApplyJob
