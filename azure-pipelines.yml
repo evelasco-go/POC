@@ -71,12 +71,12 @@ stages:
                   -backend-config="key=terraform.tfstate"
 
                 # Run Terraform Plan
-                terraform plan -out=$(System.DefaultWorkingDirectory)/tfplan
+                terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
 
                 # Ensure the tfplan file exists and upload as an artifact
-                if [ -f "$(System.DefaultWorkingDirectory)/tfplan" ]; then
+                if [ -f "$(Build.ArtifactStagingDirectory)/tfplan" ]; then
                   echo "Terraform plan file exists. Uploading..."
-                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+                  echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(Build.ArtifactStagingDirectory)/tfplan"
                 else
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
@@ -100,4 +100,4 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 # Apply the tfplan file to provision resources
-                terraform apply -auto-approve $(System.DefaultWorkingDirectory)/tfplan
+                terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/tfplan
