@@ -27,24 +27,24 @@ stages:
         steps:
           - task: AzureCLI@2
             inputs:
-              azureSubscription: $(azure_subscription)  # Use the correct service connection
+              azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
                 # Create Resource Group
-                az group create --name ${{ variables.RESOURCE_GROUP_NAME }} --location "East US"
+                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
 
-                # Create Storage Account with a valid name (must be lowercase and between 3-24 characters)
+                # Create Storage Account
                 az storage account create \
-                  --name ${{ variables.STORAGE_ACCOUNT_NAME }} \
-                  --resource-group ${{ variables.RESOURCE_GROUP_NAME }} \
-                  --location "East US" \
+                  --name $(STORAGE_ACCOUNT_NAME) \
+                  --resource-group $(RESOURCE_GROUP_NAME) \
+                  --location $(LOCATION) \
                   --sku Standard_LRS
 
-                # Create a container to store Terraform state
+                # Create Storage Container
                 az storage container create \
-                  --name ${{ variables.CONTAINER_NAME }} \
-                  --account-name ${{ variables.STORAGE_ACCOUNT_NAME }}
+                  --name $(CONTAINER_NAME) \
+                  --account-name $(STORAGE_ACCOUNT_NAME)
 
   - stage: TerraformInit
     displayName: "Initialize Terraform"
@@ -58,8 +58,7 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Initialize Terraform with backend configuration
-                terraform init -reconfigure  # Ensure Terraform is configured with the backend correctly
+                terraform init -reconfigure
 
   - stage: TerraformPlan
     displayName: "Plan Infrastructure"
@@ -73,11 +72,9 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Run Terraform Plan
                 terraform plan -out=tfplan
 
-                # Upload the plan as an artifact
-                echo "Uploading plan artifact..."
+                # Upload plan artifact
                 echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]tfplan"
 
   - stage: TerraformApply
@@ -94,7 +91,6 @@ stages:
               steps:
                 - download: tfplan
                   artifact: tfplan
-                  displayName: "Download Plan Artifact"
 
                 - task: AzureCLI@2
                   inputs:
@@ -102,5 +98,4 @@ stages:
                     scriptType: 'bash'
                     scriptLocation: 'inlineScript'
                     inlineScript: |
-                      # Apply the Terraform plan
                       terraform apply -auto-approve tfplan
