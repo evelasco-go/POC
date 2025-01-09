@@ -51,6 +51,10 @@ stages:
       - job: TerraformInitAndPlanJob
         displayName: "Terraform Init and Plan"
         steps:
+          - task: TerraformInstaller@0  # Install a specific version of Terraform
+            inputs:
+              terraformVersion: '1.10.3'  # Make sure this is the version of your plan file
+
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
@@ -78,7 +82,7 @@ stages:
                 terraform plan -out=./tfplan
 
                 # Upload the plan file as an artifact
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+                echo "##vso[artifact.upload artifactname=tfplan;containerfolder=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
   - stage: TerraformApply
     displayName: "Apply Infrastructure"
@@ -92,6 +96,10 @@ stages:
             inputs:
               artifactName: tfplan
               downloadPath: $(Pipeline.Workspace)
+
+          - task: TerraformInstaller@0  # Ensure same version for apply
+            inputs:
+              terraformVersion: '1.10.3'  # Match the version of your plan file
 
           - task: AzureCLI@2
             inputs:
