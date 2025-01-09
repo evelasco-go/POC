@@ -19,7 +19,6 @@ variables:
 
 stages:
 
-  # Stage 1: Create Azure Resources
   - stage: CreateResources
     displayName: "Create Azure Resources"
     jobs:
@@ -42,13 +41,12 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  # Stage 2: Terraform Init, Import, and Plan
   - stage: TerraformInitAndPlan
-    displayName: "Initialize, Import, and Plan Terraform"
+    displayName: "Terraform Init and Plan"
     dependsOn: CreateResources
     jobs:
       - job: TerraformInitAndPlanJob
-        displayName: "Terraform Init, Import, and Plan"
+        displayName: "Terraform Init and Plan"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -67,15 +65,9 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
                 
-                # Import existing storage account into state
-                terraform import azurerm_storage_account.storage \
-                  "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)"
-                
-                # Generate the plan
-                terraform plan -out=./tfplan
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
+                terraform providers lock -platform=linux_amd64
+                terraform plan -out=tfplan
 
-  # Stage 3: Terraform Apply
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
     dependsOn: TerraformInitAndPlan
@@ -84,19 +76,15 @@ stages:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifactName: tfplan
-              downloadPath: $(Pipeline.Workspace)
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                cd $(Pipeline.Workspace)
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                terraform apply -auto-approve ./tfplan
+                terraform init -lockfile=readonly
+                terraform apply -auto-approve tfplan
