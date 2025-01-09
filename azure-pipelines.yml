@@ -101,4 +101,8 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 # Apply the tfplan file to provision resources
-                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
+                if [ -f "$(Pipeline.Workspace)/tfplan" ]; then
+                  terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan"
+                else
+                  echo "tfplan file is missing. Exiting."
+                  exit 1
