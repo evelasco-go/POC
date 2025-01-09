@@ -63,6 +63,7 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
+                # Initialize Terraform with reconfiguration
                 terraform init -reconfigure
 
   - stage: TerraformPlan
@@ -77,9 +78,10 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                # Run Terraform Plan
                 terraform plan -out=tfplan
 
-                # Ensure the plan is created before uploading it as an artifact
+                # Check if the plan file was created successfully
                 if [ ! -f "tfplan" ]; then
                   echo "Terraform plan file does not exist. Exiting."
                   exit 1
