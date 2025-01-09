@@ -65,8 +65,14 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
                 
-                terraform providers lock -platform=linux_amd64
                 terraform plan -out=tfplan
+
+          # Publish tfplan as a pipeline artifact
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: "$(System.DefaultWorkingDirectory)/tfplan"
+              artifact: "tfplan"
+              publishLocation: "pipeline"
 
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
@@ -76,6 +82,12 @@ stages:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
+          # Download tfplan artifact
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifactName: "tfplan"
+              targetPath: "$(Pipeline.Workspace)/tfplan"
+          
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
@@ -86,5 +98,5 @@ stages:
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                terraform init -lockfile=readonly
-                terraform apply -auto-approve tfplan
+                terraform init
+                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
