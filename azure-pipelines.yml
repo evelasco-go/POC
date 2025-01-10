@@ -36,12 +36,14 @@ stages:
                 # Login to Azure using Service Principal credentials
                 az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
 
-                # Ensure Terraform backend is initialized properly
+                # Initialize Terraform with backend configuration (debug step)
+                echo "Initializing Terraform..."
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
+                  -backend-config="key=terraform.tfstate" \
+                  -input=false
 
                 # Remove the AKS cluster from Terraform state if it already exists
                 terraform state rm azurerm_kubernetes_cluster.aks || true
@@ -62,12 +64,14 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Ensure Terraform backend is initialized properly (again before planning/applying)
+                # Re-run terraform init to reinitialize the backend before planning and applying
+                echo "Reinitializing Terraform with backend..."
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
+                  -backend-config="key=terraform.tfstate" \
+                  -input=false
 
                 # Run terraform plan and output the plan file
                 terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
