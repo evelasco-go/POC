@@ -33,7 +33,7 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                # Login to Azure
+                # Login to Azure using Service Principal credentials
                 az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
                 
                 # Initialize Terraform with backend configuration
@@ -43,7 +43,7 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
                 
-                # Remove the AKS cluster from Terraform state if already managed
+                # Remove the AKS cluster from Terraform state if it already exists
                 terraform state rm azurerm_kubernetes_cluster.aks || true
 
                 # Import the existing AKS cluster into Terraform
