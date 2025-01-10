@@ -11,6 +11,7 @@ variables:
   LOCATION: "eastus"
   NODE_COUNT: 2
   AKS_NAME: "MyAKSCluster"
+  # Hardcoded values for debugging
   AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
   AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
   AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
@@ -66,7 +67,11 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
                 
-                # Initialize Terraform with reconfigure flag
+                # Clean up existing Terraform state to avoid conflicts
+                rm -rf .terraform
+                rm -f .terraform.lock.hcl
+
+                # Initialize Terraform with reconfigure and backend setup
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
