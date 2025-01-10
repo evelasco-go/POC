@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - dev  # Replace with your branch name
+      - dev
 
 variables:
   azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
@@ -18,8 +18,6 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-
-  # Stage 1: Install Terraform Version 1.9.8
   - stage: InstallTerraform
     displayName: "Install Terraform Version 1.9.8"
     jobs:
@@ -28,39 +26,14 @@ stages:
         steps:
           - task: TerraformInstaller@0
             inputs:
-              terraformVersion: '1.9.8'  # Ensures you're using Terraform version 1.9.8
+              terraformVersion: '1.9.8'
 
-  # Stage 2: Create Azure Resources
-  - stage: CreateResources
-    displayName: "Create Azure Resources"
+  - stage: ImportExistingResources
+    displayName: "Import Existing Resources"
     dependsOn: InstallTerraform
     jobs:
-      - job: CreateAzureResources
-        displayName: "Create Resource Group and Storage Account"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
-                az storage account create \
-                  --name $(STORAGE_ACCOUNT_NAME) \
-                  --resource-group $(RESOURCE_GROUP_NAME) \
-                  --location $(LOCATION) \
-                  --sku Standard_LRS
-                az storage container create \
-                  --name $(CONTAINER_NAME) \
-                  --account-name $(STORAGE_ACCOUNT_NAME)
-
-  # Stage 3: Terraform Init, Import, and Plan
-  - stage: TerraformInitImportAndPlan
-    displayName: "Initialize, Import, and Plan Terraform"
-    dependsOn: CreateResources
-    jobs:
-      - job: TerraformInitImportAndPlanJob
-        displayName: "Terraform Init, Import, and Plan"
+      - job: ImportResources
+        displayName: "Import AKS Cluster"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -72,46 +45,64 @@ stages:
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+                
+                # Import the existing AKS cluster into Terraform
+                terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
 
-                # Clear any existing lock file to avoid dependency issues
-                rm -f terraform.lock.hcl
-
-                # Initialize Terraform with reconfiguration
-                terraform init -upgrade -reconfigure \
+  - stage: TerraformInitAndPlan
+    displayName: "Initialize and Plan Terraform"
+    dependsOn: ImportExistingResources
+    jobs:
+      - job: TerraformInitAndPlanJob
+        displayName: "Terraform Init and Plan"
+        steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azure_subscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+                
+                # Initialize Terraform with reconfigure flag
+                terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
+                  -backend-config="key=terraform.tfstate" \
+                  -get-plugins=true
 
-                # Import the existing resource group
-                terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
+                # Run terraform plan and output the plan to a specific directory
+                terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
 
-                # Plan the Terraform changes and output it to a file
-                terraform plan -out=tfplan
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
-
-  # Stage 4: Terraform Apply
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
-    dependsOn: TerraformInitImportAndPlan
+    dependsOn: TerraformInitAndPlan
     condition: succeeded()
     jobs:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
-          - task: DownloadPipelineArtifact@2
+          - task: PublishBuildArtifacts@1
             inputs:
-              artifactName: tfplan
-              downloadPath: $(Pipeline.Workspace)
+              PathtoPublish: $(Build.ArtifactStagingDirectory)
+              ArtifactName: 'tfplan'
+              publishLocation: 'Container'
+
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                cd $(Pipeline.Workspace)
+                cd $(Build.ArtifactStagingDirectory)
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+
+                # Apply the plan
                 terraform apply -auto-approve tfplan
