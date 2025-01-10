@@ -29,7 +29,7 @@ stages:
           - task: TerraformInstaller@0
             inputs:
               terraformVersion: '1.9.8'  # Ensures you're using Terraform version 1.9.8
-  
+
   # Stage 2: Create Azure Resources
   - stage: CreateResources
     displayName: "Create Azure Resources"
@@ -72,6 +72,9 @@ stages:
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+                
+                # Clean up any existing lock file (force re-initialize)
+                rm -f terraform.lock.hcl
                 
                 # Initialize Terraform
                 terraform init -upgrade \
