@@ -18,17 +18,17 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-  
-  # Stage 1: Install Latest Terraform Version
+
+  # Stage 1: Install Terraform Version 1.9.8
   - stage: InstallTerraform
-    displayName: "Install Latest Terraform Version"
+    displayName: "Install Terraform Version 1.9.8"
     jobs:
       - job: InstallTerraformJob
         displayName: "Install Terraform"
         steps:
           - task: TerraformInstaller@0
             inputs:
-              terraformVersion: 'latest'  # Ensures you're using the latest Terraform version
+              terraformVersion: '1.9.8'  # Ensures you're using Terraform version 1.9.8
   
   # Stage 2: Create Azure Resources
   - stage: CreateResources
