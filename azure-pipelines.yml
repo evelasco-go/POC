@@ -17,8 +17,7 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-
-  - stage: TerraformManageState
+  - stage: TerraformManageStateAndApply
     displayName: "Terraform Init, Import, Plan, and Apply"
     jobs:
       - job: TerraformJob
