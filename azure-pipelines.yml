@@ -42,12 +42,12 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
- # Stage 1: Terraform Init and Cleanup
-  - stage: TerraformInitAndCleanup
-    displayName: "Terraform Init and Cleanup"
+ # Stage: Terraform Init and Plan Combined
+  - stage: TerraformInitPlanAndApply
+    displayName: "Terraform Init, Plan, and Apply"
     jobs:
-      - job: InitCleanup
-        displayName: "Initialize and Cleanup State"
+      - job: TerraformJob
+        displayName: "Initialize, Plan, and Apply"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -60,14 +60,14 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform with the backend
-                terraform init -upgrade \
+                # Initialize Terraform with backend configuration
+                terraform init -upgrade -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Check if the resource exists in the state
+                # Remove resource from state if necessary
                 if terraform state list | grep -q 'azurerm_resource_group.rg'; then
                   echo "Resource already exists in the state. Removing it..."
                   terraform state rm azurerm_resource_group.rg
@@ -75,41 +75,8 @@ stages:
                   echo "Resource not found in the state. Skipping removal."
                 fi
 
-  # Stage 2: Terraform Plan
-  - stage: TerraformPlan
-    displayName: "Terraform Plan"
-    dependsOn: TerraformInitAndCleanup
-    jobs:
-      - job: Plan
-        displayName: "Plan Terraform Changes"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
+                # Run Terraform Plan
                 terraform plan -out=tfplan
-                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
-  # Stage 3: Terraform Apply
-  - stage: TerraformApply
-    displayName: "Terraform Apply"
-    dependsOn: TerraformPlan
-    condition: succeeded()
-    jobs:
-      - job: Apply
-        displayName: "Apply Terraform Plan"
-        steps:
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifactName: tfplan
-              downloadPath: $(Pipeline.Workspace)
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                cd $(Pipeline.Workspace)
+                # Apply the plan
                 terraform apply -auto-approve tfplan
