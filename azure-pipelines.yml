@@ -18,7 +18,6 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-
   # Stage 1: Install Terraform Version 1.9.8
   - stage: InstallTerraform
     displayName: "Install Terraform Version 1.9.8"
@@ -29,7 +28,7 @@ stages:
           - task: TerraformInstaller@0
             inputs:
               terraformVersion: '1.9.8'  # Ensures you're using Terraform version 1.9.8
-  
+
   # Stage 2: Create Azure Resources
   - stage: CreateResources
     displayName: "Create Azure Resources"
@@ -54,13 +53,13 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  # Stage 3: Terraform Init, Import, and Plan
-  - stage: TerraformInitImportAndPlan
-    displayName: "Initialize, Import, and Plan Terraform"
+  # Stage 3: Terraform Init and Plan
+  - stage: TerraformInitAndPlan
+    displayName: "Initialize and Plan Terraform"
     dependsOn: CreateResources
     jobs:
-      - job: TerraformInitImportAndPlanJob
-        displayName: "Terraform Init, Import, and Plan"
+      - job: TerraformInitAndPlanJob
+        displayName: "Terraform Init and Plan"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -84,19 +83,13 @@ stages:
                   -backend-config="key=terraform.tfstate" \
                   -get-plugins=true
 
-                # Initialize providers to ensure correct dependencies
-                terraform providers lock
-                
-                # Import the existing resource group
-                terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
-
                 # Run terraform plan and output the plan to a specific directory
                 terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
 
   # Stage 4: Terraform Apply
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
-    dependsOn: TerraformInitImportAndPlan
+    dependsOn: TerraformInitAndPlan
     condition: succeeded()
     jobs:
       - job: TerraformApplyJob
@@ -119,4 +112,6 @@ stages:
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+
+                # Apply the plan
                 terraform apply -auto-approve tfplan
