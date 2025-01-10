@@ -8,20 +8,47 @@ variables:
   RESOURCE_GROUP_NAME: "POCMyResourceGroup"
   STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
   CONTAINER_NAME: "tfstate"
-  LOCATION: "eastus"
+  LOCATION: "eastus"  # Corrected location format
   NODE_COUNT: 2
   AKS_NAME: "MyAKSCluster"
+  # Hardcoded values for debugging
   AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
   AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
   AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-  - stage: TerraformManageStateAndApply
-    displayName: "Terraform Init, Import, Plan, and Apply"
+
+  # Stage 1: Create Azure Resources
+  - stage: CreateResources
+    displayName: "Create Azure Resources"
     jobs:
-      - job: TerraformJob
-        displayName: "Manage Terraform State and Apply"
+      - job: CreateAzureResources
+        displayName: "Create Resource Group and Storage Account"
+        steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azure_subscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
+                az storage account create \
+                  --name $(STORAGE_ACCOUNT_NAME) \
+                  --resource-group $(RESOURCE_GROUP_NAME) \
+                  --location $(LOCATION) \
+                  --sku Standard_LRS
+                az storage container create \
+                  --name $(CONTAINER_NAME) \
+                  --account-name $(STORAGE_ACCOUNT_NAME)
+
+  # Stage 2: Terraform Init, Import, and Plan
+  - stage: TerraformInitImportAndPlan
+    displayName: "Initialize, Import, and Plan Terraform"
+    dependsOn: CreateResources
+    jobs:
+      - job: TerraformInitImportAndPlanJob
+        displayName: "Terraform Init, Import, and Plan"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -33,32 +60,46 @@ stages:
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-
-                # Initialize Terraform with backend configuration
-                terraform init -upgrade -reconfigure \
+                
+                # Initialize Terraform
+                terraform init -upgrade \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Import the existing resource group if not managed
-                if ! terraform state list | grep -q 'azurerm_resource_group.rg'; then
-                  echo "Importing existing resource group into Terraform state..."
-                  terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
-                else
-                  echo "Resource group already managed by Terraform."
-                fi
+                # Import the existing resource group into Terraform state
+                terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
 
-                # Import the existing storage container if not managed
-                if ! terraform state list | grep -q 'azurerm_storage_container.container'; then
-                  echo "Importing existing storage container into Terraform state..."
-                  terraform import azurerm_storage_container.container "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)"
-                else
-                  echo "Storage container already managed by Terraform."
-                fi
+                # Import the existing storage container into Terraform state
+                terraform import azurerm_storage_container.container "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)"
 
-                # Plan and save the plan to tfplan
+                # Plan the Terraform changes
                 terraform plan -out=tfplan
+                echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
-                # Apply the plan
+  # Stage 3: Terraform Apply
+  - stage: TerraformApply
+    displayName: "Apply Terraform Plan"
+    dependsOn: TerraformInitImportAndPlan
+    condition: succeeded()
+    jobs:
+      - job: TerraformApplyJob
+        displayName: "Apply Terraform"
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifactName: tfplan
+              downloadPath: $(Pipeline.Workspace)
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azure_subscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                cd $(Pipeline.Workspace)
+                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
                 terraform apply -auto-approve tfplan
