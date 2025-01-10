@@ -18,30 +18,6 @@ variables:
 
 stages:
 
-  # Stage 1: Create Azure Resources
-  - stage: CreateResources
-    displayName: "Create Azure Resources"
-    jobs:
-      - job: CreateAzureResources
-        displayName: "Create Resource Group and Storage Account"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                az group create --name $(RESOURCE_GROUP_NAME) --location $(LOCATION)
-                az storage account create \
-                  --name $(STORAGE_ACCOUNT_NAME) \
-                  --resource-group $(RESOURCE_GROUP_NAME) \
-                  --location $(LOCATION) \
-                  --sku Standard_LRS
-                az storage container create \
-                  --name $(CONTAINER_NAME) \
-                  --account-name $(STORAGE_ACCOUNT_NAME)
-
   - stage: TerraformManageState
     displayName: "Terraform Init, Import, Plan, and Apply"
     jobs:
@@ -66,12 +42,20 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Import the existing resource group into Terraform state
+                # Import the existing resource group if not managed
                 if ! terraform state list | grep -q 'azurerm_resource_group.rg'; then
                   echo "Importing existing resource group into Terraform state..."
                   terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
                 else
                   echo "Resource group already managed by Terraform."
+                fi
+
+                # Import the existing storage container if not managed
+                if ! terraform state list | grep -q 'azurerm_storage_container.container'; then
+                  echo "Importing existing storage container into Terraform state..."
+                  terraform import azurerm_storage_container.container "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)"
+                else
+                  echo "Storage container already managed by Terraform."
                 fi
 
                 # Plan and save the plan to tfplan
