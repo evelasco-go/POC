@@ -8,7 +8,7 @@ variables:
   RESOURCE_GROUP_NAME: "POCMyResourceGroup"
   STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
   CONTAINER_NAME: "tfstate"
-  LOCATION: "eastus"  # Corrected location format
+  LOCATION: "eastus"
   NODE_COUNT: 2
   AKS_NAME: "MyAKSCluster"
   # Hardcoded values for debugging
@@ -18,10 +18,22 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-
-  # Stage 1: Create Azure Resources
+  
+  # Stage 1: Install Latest Terraform Version
+  - stage: InstallTerraform
+    displayName: "Install Latest Terraform Version"
+    jobs:
+      - job: InstallTerraformJob
+        displayName: "Install Terraform"
+        steps:
+          - task: TerraformInstaller@0
+            inputs:
+              terraformVersion: 'latest'  # Ensures you're using the latest Terraform version
+  
+  # Stage 2: Create Azure Resources
   - stage: CreateResources
     displayName: "Create Azure Resources"
+    dependsOn: InstallTerraform
     jobs:
       - job: CreateAzureResources
         displayName: "Create Resource Group and Storage Account"
@@ -42,7 +54,7 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
-  # Stage 2: Terraform Init, Import, and Plan
+  # Stage 3: Terraform Init, Import, and Plan
   - stage: TerraformInitImportAndPlan
     displayName: "Initialize, Import, and Plan Terraform"
     dependsOn: CreateResources
@@ -68,17 +80,14 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Import the existing resource group into Terraform state
+                # Import the existing resource group
                 terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
-
-                # Import the existing storage container into Terraform state
-                terraform import azurerm_storage_container.container "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)"
 
                 # Plan the Terraform changes
                 terraform plan -out=tfplan
                 echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
-  # Stage 3: Terraform Apply
+  # Stage 4: Terraform Apply
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
     dependsOn: TerraformInitImportAndPlan
