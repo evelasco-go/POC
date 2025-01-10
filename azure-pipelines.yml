@@ -79,11 +79,17 @@ stages:
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
-
+                
+                # Remove any existing lock file to avoid dependency issues
+                rm -f terraform.lock.hcl
+                
+                # Initialize the providers
+                terraform init
+                
                 # Import the existing resource group
                 terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
 
-                # Plan the Terraform changes
+                # Generate a new Terraform plan
                 terraform plan -out=tfplan
                 echo "##vso[artifact.upload containerfolder=tfplan;artifactname=tfplan]$(System.DefaultWorkingDirectory)/tfplan"
 
