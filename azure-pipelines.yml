@@ -11,7 +11,6 @@ variables:
   LOCATION: "eastus"
   NODE_COUNT: 2
   AKS_NAME: "MyAKSCluster"
-  # Hardcoded values for debugging
   AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
   AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
   AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
@@ -41,24 +40,26 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                set -e
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                
-                # Clean up any existing Terraform state to avoid conflicts
-                rm -rf .terraform
-                rm -f .terraform.lock.hcl
-                
+
                 # Initialize Terraform
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
-                
-                # Import the existing AKS cluster into Terraform
-                terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
+
+                # Check if the resource is already managed
+                if terraform state list | grep -q azurerm_kubernetes_cluster.aks; then
+                  echo "Resource is already managed by Terraform. Skipping import."
+                else
+                  echo "Importing AKS cluster into Terraform state."
+                  terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
+                fi
 
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
@@ -73,23 +74,20 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                set -e
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                
-                # Clean up existing Terraform state to avoid conflicts
-                rm -rf .terraform
-                rm -f .terraform.lock.hcl
 
-                # Initialize Terraform with reconfigure flag
+                # Initialize Terraform
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Run terraform plan and output the plan to a specific directory
+                # Plan Terraform changes
                 terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
 
   - stage: TerraformApply
@@ -112,11 +110,12 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                set -e
                 cd $(Build.ArtifactStagingDirectory)
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Apply the plan
+                # Apply Terraform plan
                 terraform apply -auto-approve tfplan
