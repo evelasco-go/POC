@@ -1,5 +1,5 @@
 terraform {
-  required_version = "1.5.7"  # Match the Terraform version used to create the plan
+  required_version = ">= 1.5.7, < 2.0.0"  # Match the Terraform version used to create the plan
   
   backend "azurerm" {
     resource_group_name  = "POCMyResourceGroup"
