@@ -47,6 +47,9 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
                 
+                # Remove the AKS cluster from Terraform state (if already managed)
+                terraform state rm azurerm_kubernetes_cluster.aks
+
                 # Import the AKS cluster into Terraform
                 terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
 
