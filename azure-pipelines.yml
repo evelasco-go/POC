@@ -17,91 +17,54 @@ variables:
   AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 stages:
-  - stage: InstallTerraform
-    displayName: "Install Terraform Version 1.9.8"
+  - stage: InstallAndImport
+    displayName: "Install Terraform and Import Resources"
     jobs:
-      - job: InstallTerraformJob
-        displayName: "Install Terraform"
+      - job: TerraformImport
+        displayName: "Install Terraform and Import AKS Cluster"
         steps:
           - task: TerraformInstaller@0
             inputs:
               terraformVersion: '1.9.8'
 
-  - stage: ImportExistingResources
-    displayName: "Import Existing Resources"
-    dependsOn: InstallTerraform
-    jobs:
-      - job: ImportResources
-        displayName: "Import AKS Cluster"
-        steps:
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                # Azure login
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+                az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID
                 
-                # Import the existing AKS cluster into Terraform
-                terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
-
-  - stage: TerraformInitAndPlan
-    displayName: "Initialize and Plan Terraform"
-    dependsOn: ImportExistingResources
-    jobs:
-      - job: TerraformInitAndPlanJob
-        displayName: "Terraform Init and Plan"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-                
-                # Ensure Terraform initialization with reconfigure
+                # Initialize Terraform backend
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate" \
-                  -get-plugins=true
+                  -backend-config="key=terraform.tfstate"
+                
+                # Import the AKS cluster into Terraform
+                terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
 
-                # Run terraform plan and output the plan to a specific directory
-                terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
-
-  - stage: TerraformApply
-    displayName: "Apply Terraform Plan"
-    dependsOn: TerraformInitAndPlan
-    condition: succeeded()
+  - stage: PlanAndApply
+    displayName: "Plan and Apply Terraform"
+    dependsOn: InstallAndImport
     jobs:
-      - job: TerraformApplyJob
-        displayName: "Apply Terraform"
+      - job: TerraformPlanApply
+        displayName: "Terraform Plan and Apply"
         steps:
-          - task: PublishBuildArtifacts@1
-            inputs:
-              PathtoPublish: $(Build.ArtifactStagingDirectory)
-              ArtifactName: 'tfplan'
-              publishLocation: 'Container'
-
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                cd $(Build.ArtifactStagingDirectory)
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-
-                # Apply the plan
+                # Ensure Terraform initialization (already done in previous stage)
+                terraform plan -out=tfplan
+                
+                # Apply Terraform plan
                 terraform apply -auto-approve tfplan
