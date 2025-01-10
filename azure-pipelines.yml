@@ -42,12 +42,11 @@ stages:
                   --name $(CONTAINER_NAME) \
                   --account-name $(STORAGE_ACCOUNT_NAME)
 
- # Stage: Terraform Init and Plan Combined
-  - stage: TerraformInitPlanAndApply
-    displayName: "Terraform Init, Plan, and Apply"
+  - stage: TerraformManageState
+    displayName: "Terraform Init, Import, Plan, and Apply"
     jobs:
       - job: TerraformJob
-        displayName: "Initialize, Plan, and Apply"
+        displayName: "Manage Terraform State and Apply"
         steps:
           - task: AzureCLI@2
             inputs:
@@ -67,15 +66,15 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Remove resource from state if necessary
-                if terraform state list | grep -q 'azurerm_resource_group.rg'; then
-                  echo "Resource already exists in the state. Removing it..."
-                  terraform state rm azurerm_resource_group.rg
+                # Import the existing resource group into Terraform state
+                if ! terraform state list | grep -q 'azurerm_resource_group.rg'; then
+                  echo "Importing existing resource group into Terraform state..."
+                  terraform import azurerm_resource_group.rg "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)"
                 else
-                  echo "Resource not found in the state. Skipping removal."
+                  echo "Resource group already managed by Terraform."
                 fi
 
-                # Run Terraform Plan
+                # Plan and save the plan to tfplan
                 terraform plan -out=tfplan
 
                 # Apply the plan
