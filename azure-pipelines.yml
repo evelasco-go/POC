@@ -27,46 +27,9 @@ stages:
             inputs:
               terraformVersion: '1.9.8'
 
-  - stage: ImportExistingResources
-    displayName: "Import Existing Resources"
-    dependsOn: InstallTerraform
-    jobs:
-      - job: ImportResources
-        displayName: "Import AKS Cluster"
-        steps:
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-
-                # Set permissions
-                chmod -R 777 $(Pipeline.Workspace)
-
-                # Initialize Terraform
-                terraform init -reconfigure \
-                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                  -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
-
-                # Check if the resource is already managed
-                if terraform state list | grep -q azurerm_kubernetes_cluster.aks; then
-                  echo "Resource is already managed by Terraform. Skipping import."
-                else
-                  echo "Importing AKS cluster into Terraform state."
-                  terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
-                fi
-
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
-    dependsOn: ImportExistingResources
+    dependsOn: InstallTerraform
     jobs:
       - job: TerraformInitAndPlanJob
         displayName: "Terraform Init and Plan"
@@ -83,18 +46,15 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Set permissions
-                chmod -R 777 $(Pipeline.Workspace)
-
-                # Initialize Terraform
-                terraform init -reconfigure \
+                # Initialize Terraform with provider installation
+                terraform init -upgrade -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
                 # Plan Terraform changes
-                terraform plan -out=$(Pipeline.Workspace)/tfplan
+                terraform plan -out=tfplan
 
           - task: PublishBuildArtifacts@1
             inputs:
@@ -127,6 +87,13 @@ stages:
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+
+                # Initialize Terraform to ensure dependencies match
+                terraform init -upgrade -reconfigure \
+                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                  -backend-config="container_name=$(CONTAINER_NAME)" \
+                  -backend-config="key=terraform.tfstate"
 
                 # Apply Terraform plan
                 terraform apply -auto-approve tfplan
