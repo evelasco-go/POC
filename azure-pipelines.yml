@@ -50,12 +50,15 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform with version 1.10.3
+                # Initialize Terraform with version 1.10.3 and make sure the provider is selected
                 terraform init -upgrade -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
+
+                # Ensure the provider version is set in the configuration before planning
+                terraform providers lock -platform=linux_amd64
 
                 # Generate a new Terraform plan to avoid version mismatches
                 terraform plan -out=$(Pipeline.Workspace)/tfplan
@@ -104,6 +107,9 @@ stages:
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
+
+                # Re-lock the provider versions to avoid dependency issues
+                terraform providers lock -platform=linux_amd64
 
                 # Apply the Terraform plan using the same version
                 terraform apply -auto-approve tfplan
