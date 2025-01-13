@@ -74,6 +74,12 @@ stages:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
+          # Ensure Git permissions are correctly set
+          - script: |
+              sudo chmod -R 777 /home/vsts/work/1/s/.git
+            displayName: 'Fix Git Permissions Before Apply'
+          
+          # Download the Terraform plan artifact from previous stage
           - task: DownloadPipelineArtifact@2
             inputs:
               buildType: 'current'
