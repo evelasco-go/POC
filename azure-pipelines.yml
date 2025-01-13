@@ -64,7 +64,7 @@ stages:
                 # Import the existing storage container
                 terraform import \
                   azurerm_storage_container.container \
-                  "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)" || echo "Container already imported or does not exist."
+                  "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)" || echo "Container already imported."
 
                 # Plan and apply Terraform
                 terraform plan -out=terraform.plan -var="azure_subscription_id=$(AZURE_SUBSCRIPTION_ID)" \
