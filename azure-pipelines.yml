@@ -50,8 +50,8 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Navigate to the correct working directory
-                cd $(Build.SourcesDirectory)/your-terraform-directory
+                # Use the correct working directory, this should point to your Terraform directory
+                cd $(Build.SourcesDirectory)/path/to/your/terraform
 
                 # Remove old lock files and terraform configuration
                 rm -rf .terraform .terraform.lock.hcl terraform.plan
@@ -67,7 +67,7 @@ stages:
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: $(Build.SourcesDirectory)/your-terraform-directory
+              PathtoPublish: $(Build.SourcesDirectory)/path/to/your/terraform
               ArtifactName: 'terraform-plan'
               publishLocation: 'Container'
 
@@ -95,7 +95,7 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 set -e
-                cd $(Build.SourcesDirectory)/your-terraform-directory
+                cd $(Build.SourcesDirectory)/path/to/your/terraform
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
