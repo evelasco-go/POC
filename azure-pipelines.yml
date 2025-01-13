@@ -46,19 +46,19 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform with provider installation
+                # Initialize Terraform
                 terraform init -upgrade -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Plan Terraform changes
-                terraform plan -out=tfplan
+                # Create plan in the pipeline's workspace
+                terraform plan -out=$(Pipeline.Workspace)/tfplan
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: $(Pipeline.Workspace)/tfplan
+              PathtoPublish: $(Pipeline.Workspace)
               ArtifactName: 'tfplan'
               publishLocation: 'Container'
 
@@ -88,7 +88,7 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform to ensure dependencies match
+                # Initialize Terraform
                 terraform init -upgrade -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
