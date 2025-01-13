@@ -50,9 +50,8 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Remove any previous lock file and terraform directory
-                rm -f .terraform.lock.hcl
-                rm -rf .terraform
+                # Remove old lock files and terraform configuration
+                rm -rf .terraform .terraform.lock.hcl
 
                 # Reinitialize terraform with upgrade flag to update modules and lockfile
                 terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
@@ -100,7 +99,7 @@ stages:
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
                 # Remove old lock files before applying the plan
-                rm -f .terraform.lock.hcl
+                rm -rf .terraform .terraform.lock.hcl
 
                 # Reinitialize Terraform with the correct backend configuration and upgrade modules
                 terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
