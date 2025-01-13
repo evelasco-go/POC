@@ -62,6 +62,7 @@ stages:
                 else
                   echo "Importing AKS cluster into Terraform state."
                   terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
+                fi
 
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
@@ -129,4 +130,3 @@ stages:
 
                 # Apply Terraform plan
                 terraform apply -auto-approve tfplan
-
