@@ -62,7 +62,7 @@ stages:
                                -backend-config="container_name=$(CONTAINER_NAME)" \
                                -backend-config="key=terraform.tfstate"
 
-                # Generate a new Terraform plan
+                # Generate a new Terraform plan and save as terraform.plan
                 terraform plan -out=terraform.plan
 
           - task: PublishBuildArtifacts@1
