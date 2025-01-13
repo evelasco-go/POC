@@ -38,38 +38,34 @@ stages:
               sudo chmod -R 777 /home/vsts/work/1/s/.git
             displayName: 'Fix Git Permissions'
 
-          - task: AzureCLI@2
+          - script: |
+              set -e
+              export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+              export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+              export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+              export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+
+              # Navigate to the working directory
+              cd $(Build.SourcesDirectory)
+
+              # Clean up old Terraform files
+              rm -rf .terraform .terraform.lock.hcl terraform.plan
+
+              # Initialize Terraform backend
+              terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                             -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                             -backend-config="container_name=$(CONTAINER_NAME)" \
+                             -backend-config="key=terraform.tfstate"
+
+              # Generate a new Terraform plan
+              terraform plan -out=terraform.plan
+            displayName: "Terraform Init and Plan"
+
+          - task: PublishPipelineArtifact@1
             inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-
-                # If your Terraform files are at the root of the repository, use $(Build.SourcesDirectory)
-                cd $(Build.SourcesDirectory)
-
-                # Remove old lock files and terraform configuration
-                rm -rf .terraform .terraform.lock.hcl terraform.plan
-
-                # Reinitialize terraform with upgrade flag to update modules and lockfile
-                terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                               -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                               -backend-config="container_name=$(CONTAINER_NAME)" \
-                               -backend-config="key=terraform.tfstate"
-
-                # Generate a new Terraform plan and save as terraform.plan
-                terraform plan -out=terraform.plan
-
-          - task: PublishBuildArtifacts@1
-            inputs:
-              PathtoPublish: $(Build.SourcesDirectory)
-              ArtifactName: 'terraform-plan'
-              publishLocation: 'Container'
+              targetPath: $(Build.SourcesDirectory)/terraform.plan
+              artifact: "terraform-plan"
+              publishLocation: "pipeline"
 
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
@@ -87,25 +83,22 @@ stages:
             inputs:
               buildType: 'current'
               artifactName: 'terraform-plan'
+              targetPath: $(Build.SourcesDirectory)
 
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                cd $(Build.SourcesDirectory)
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+          - script: |
+              set -e
+              cd $(Build.SourcesDirectory)
+              export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+              export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+              export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+              export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Reinitialize Terraform with the correct backend configuration and upgrade modules
-                terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                               -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                               -backend-config="container_name=$(CONTAINER_NAME)" \
-                               -backend-config="key=terraform.tfstate"
+              # Reinitialize Terraform with the correct backend configuration
+              terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                             -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                             -backend-config="container_name=$(CONTAINER_NAME)" \
+                             -backend-config="key=terraform.tfstate"
 
-                # Apply the generated plan
-                terraform apply -auto-approve terraform.plan
+              # Apply the Terraform plan
+              terraform apply -auto-approve terraform.plan
+            displayName: "Terraform Apply"
