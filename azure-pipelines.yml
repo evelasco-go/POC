@@ -50,13 +50,11 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Remove the lock file if it exists to avoid dependency lock issues
+                # Remove any previous lock file and terraform directory
                 rm -f .terraform.lock.hcl
-
-                # Remove existing .terraform directory to ensure a clean initialization
                 rm -rf .terraform
 
-                # Reinitialize the terraform configuration with backend
+                # Reinitialize terraform with backend configuration
                 terraform init -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                                -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                                -backend-config="container_name=$(CONTAINER_NAME)" \
@@ -101,11 +99,11 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Reinitialize Terraform to ensure a clean environment before applying the plan
+                # Ensure terraform is initialized again
                 terraform init -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                                -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                                -backend-config="container_name=$(CONTAINER_NAME)" \
                                -backend-config="key=terraform.tfstate"
 
-                # Apply the new Terraform plan
-                terraform apply -auto-approve tfplan
+                # Apply the generated plan
+                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
