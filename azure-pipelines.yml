@@ -50,17 +50,13 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Ensure the provider version is set and locked
-                terraform init -upgrade -reconfigure \
-                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                  -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
+                # Remove the lock file if it exists
+                rm -f .terraform.lock.hcl
 
-                # Run terraform providers lock to ensure the provider version is selected
-                terraform providers lock -platform=linux_amd64
+                # Reinitialize the terraform configuration
+                terraform init
 
-                # Generate a new Terraform plan to avoid version mismatches
+                # Generate a new Terraform plan
                 terraform plan -out=$(Pipeline.Workspace)/tfplan
 
           - task: PublishBuildArtifacts@1
@@ -77,12 +73,10 @@ stages:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
-          # Ensure Git permissions are correctly set
           - script: |
               sudo chmod -R 777 /home/vsts/work/1/s/.git
             displayName: 'Fix Git Permissions Before Apply'
 
-          # Download the Terraform plan artifact from the previous stage
           - task: DownloadPipelineArtifact@2
             inputs:
               buildType: 'current'
@@ -102,14 +96,7 @@ stages:
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
                 # Reinitialize Terraform with version 1.5.7 to apply the plan
-                terraform init -upgrade -reconfigure \
-                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                  -backend-config="container_name=$(CONTAINER_NAME)" \
-                  -backend-config="key=terraform.tfstate"
+                terraform init
 
-                # Run terraform providers lock to ensure the provider version is selected again
-                terraform providers lock -platform=linux_amd64
-
-                # Apply the Terraform plan using the same version
+                # Apply the new Terraform plan
                 terraform apply -auto-approve tfplan
