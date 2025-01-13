@@ -50,8 +50,11 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
+                # Navigate to the correct working directory
+                cd $(Build.SourcesDirectory)/your-terraform-directory
+
                 # Remove old lock files and terraform configuration
-                rm -rf .terraform .terraform.lock.hcl
+                rm -rf .terraform .terraform.lock.hcl terraform.plan
 
                 # Reinitialize terraform with upgrade flag to update modules and lockfile
                 terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
@@ -60,12 +63,12 @@ stages:
                                -backend-config="key=terraform.tfstate"
 
                 # Generate a new Terraform plan
-                terraform plan -out=$(Pipeline.Workspace)/tfplan
+                terraform plan -out=terraform.plan
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: $(Pipeline.Workspace)
-              ArtifactName: 'tfplan'
+              PathtoPublish: $(Build.SourcesDirectory)/your-terraform-directory
+              ArtifactName: 'terraform-plan'
               publishLocation: 'Container'
 
   - stage: TerraformApply
@@ -83,7 +86,7 @@ stages:
           - task: DownloadPipelineArtifact@2
             inputs:
               buildType: 'current'
-              artifactName: 'tfplan'
+              artifactName: 'terraform-plan'
 
           - task: AzureCLI@2
             inputs:
@@ -92,14 +95,11 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 set -e
-                cd $(Pipeline.Workspace)
+                cd $(Build.SourcesDirectory)/your-terraform-directory
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-
-                # Remove old lock files before applying the plan
-                rm -rf .terraform .terraform.lock.hcl
 
                 # Reinitialize Terraform with the correct backend configuration and upgrade modules
                 terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
@@ -108,4 +108,4 @@ stages:
                                -backend-config="key=terraform.tfstate"
 
                 # Apply the generated plan
-                terraform apply -auto-approve $(Pipeline.Workspace)/tfplan
+                terraform apply -auto-approve terraform.plan
