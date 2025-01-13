@@ -18,14 +18,14 @@ variables:
 
 stages:
   - stage: InstallTerraform
-    displayName: "Install Terraform Version 1.5.7"
+    displayName: "Install Terraform Version 1.10.4"
     jobs:
       - job: InstallTerraformJob
         displayName: "Install Terraform"
         steps:
           - task: TerraformInstaller@0
             inputs:
-              terraformVersion: '1.5.7'
+              terraformVersion: '1.10.4'
 
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
