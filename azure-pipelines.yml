@@ -57,7 +57,7 @@ stages:
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Create plan in the pipeline's workspace
+                # Generate a new Terraform plan to avoid dependency lock issues
                 terraform plan -out=$(Pipeline.Workspace)/tfplan
 
           - task: PublishBuildArtifacts@1
@@ -98,12 +98,12 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-                # Initialize Terraform
+                # Initialize Terraform (again to ensure no dependency issues)
                 terraform init -upgrade -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
                   -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
                   -backend-config="container_name=$(CONTAINER_NAME)" \
                   -backend-config="key=terraform.tfstate"
 
-                # Apply Terraform plan
+                # Apply the Terraform plan, ensuring no version mismatches
                 terraform apply -auto-approve tfplan
