@@ -62,6 +62,9 @@ stages:
                                -backend-config="container_name=$(CONTAINER_NAME)" \
                                -backend-config="key=terraform.tfstate"
 
+                # Import the existing storage container if it exists
+                terraform import azurerm_storage_container.container /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)
+
                 # Generate a new Terraform plan and apply it in one step
                 terraform plan -out=terraform.plan
                 terraform apply -auto-approve terraform.plan
