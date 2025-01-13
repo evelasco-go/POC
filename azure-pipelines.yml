@@ -46,6 +46,9 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
+                # Set permissions
+                chmod -R 777 $(Pipeline.Workspace)
+
                 # Initialize Terraform
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
@@ -59,7 +62,6 @@ stages:
                 else
                   echo "Importing AKS cluster into Terraform state."
                   terraform import azurerm_kubernetes_cluster.aks /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.ContainerService/managedClusters/$(AKS_NAME)
-                fi
 
   - stage: TerraformInitAndPlan
     displayName: "Initialize and Plan Terraform"
@@ -80,6 +82,9 @@ stages:
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
                 export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
+                # Set permissions
+                chmod -R 777 $(Pipeline.Workspace)
+
                 # Initialize Terraform
                 terraform init -reconfigure \
                   -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
@@ -92,7 +97,7 @@ stages:
 
           - task: PublishBuildArtifacts@1
             inputs:
-              PathtoPublish: $(Pipeline.Workspace)
+              PathtoPublish: $(Pipeline.Workspace)/tfplan
               ArtifactName: 'tfplan'
               publishLocation: 'Container'
 
@@ -124,3 +129,4 @@ stages:
 
                 # Apply Terraform plan
                 terraform apply -auto-approve tfplan
+
