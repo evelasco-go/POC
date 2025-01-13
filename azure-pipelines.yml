@@ -88,7 +88,13 @@ stages:
                   -backend-config="key=terraform.tfstate"
 
                 # Plan Terraform changes
-                terraform plan -out=$(Build.ArtifactStagingDirectory)/tfplan
+                terraform plan -out=$(Pipeline.Workspace)/tfplan
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: $(Pipeline.Workspace)
+              ArtifactName: 'tfplan'
+              publishLocation: 'Container'
 
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
@@ -98,11 +104,10 @@ stages:
       - job: TerraformApplyJob
         displayName: "Apply Terraform"
         steps:
-          - task: PublishBuildArtifacts@1
+          - task: DownloadPipelineArtifact@2
             inputs:
-              PathtoPublish: $(Build.ArtifactStagingDirectory)
-              ArtifactName: 'tfplan'
-              publishLocation: 'Container'
+              buildType: 'current'
+              artifactName: 'tfplan'
 
           - task: AzureCLI@2
             inputs:
@@ -111,7 +116,7 @@ stages:
               scriptLocation: 'inlineScript'
               inlineScript: |
                 set -e
-                cd $(Build.ArtifactStagingDirectory)
+                cd $(Pipeline.Workspace)
                 export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
                 export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
                 export ARM_TENANT_ID=$(AZURE_TENANT_ID)
