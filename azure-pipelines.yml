@@ -18,7 +18,7 @@ variables:
 
 stages:
   - stage: InstallTerraform
-    displayName: "Install Terraform Version 1.10.4"
+    displayName: "Install Terraform"
     jobs:
       - job: InstallTerraformJob
         displayName: "Install Terraform"
@@ -38,34 +38,43 @@ stages:
               sudo chmod -R 777 /home/vsts/work/1/s/.git
             displayName: 'Fix Git Permissions'
 
-          - script: |
-              set -e
-              export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-              export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-              export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-              export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-
-              # Navigate to the working directory
-              cd $(Build.SourcesDirectory)
-
-              # Clean up old Terraform files
-              rm -rf .terraform .terraform.lock.hcl terraform.plan
-
-              # Initialize Terraform backend
-              terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                             -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                             -backend-config="container_name=$(CONTAINER_NAME)" \
-                             -backend-config="key=terraform.tfstate"
-
-              # Generate a new Terraform plan
-              terraform plan -out=terraform.plan
-            displayName: "Terraform Init and Plan"
-
-          - task: PublishPipelineArtifact@1
+          - task: AzureCLI@2
+            displayName: "Check and Import Existing Storage Container"
             inputs:
-              targetPath: $(Build.SourcesDirectory)/terraform.plan
-              artifact: "terraform-plan"
-              publishLocation: "pipeline"
+              azureSubscription: $(azure_subscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -e
+                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+
+                # Check if the container exists
+                EXISTING_CONTAINER=$(az storage container exists --name $(CONTAINER_NAME) --account-name $(STORAGE_ACCOUNT_NAME) --query "exists" -o tsv)
+
+                if [ "$EXISTING_CONTAINER" == "true" ]; then
+                  echo "Container exists. Importing into Terraform state..."
+                  terraform import azurerm_storage_container.container /subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)
+                else
+                  echo "Container does not exist. Proceeding without import."
+                fi
+
+          - script: |
+              terraform init -upgrade \
+                -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                -backend-config="container_name=$(CONTAINER_NAME)" \
+                -backend-config="key=terraform.tfstate"
+              terraform plan -out terraform.plan
+            displayName: 'Terraform Init and Plan'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: $(Build.SourcesDirectory)
+              ArtifactName: 'terraform-plan'
+              publishLocation: 'Container'
 
   - stage: TerraformApply
     displayName: "Apply Terraform Plan"
@@ -73,7 +82,7 @@ stages:
     condition: succeeded()
     jobs:
       - job: TerraformApplyJob
-        displayName: "Apply Terraform"
+        displayName: "Apply Terraform Plan"
         steps:
           - script: |
               sudo chmod -R 777 /home/vsts/work/1/s/.git
@@ -83,22 +92,27 @@ stages:
             inputs:
               buildType: 'current'
               artifactName: 'terraform-plan'
-              targetPath: $(Build.SourcesDirectory)
 
-          - script: |
-              set -e
-              cd $(Build.SourcesDirectory)
-              export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-              export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-              export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-              export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+          - task: AzureCLI@2
+            displayName: "Apply Terraform Plan"
+            inputs:
+              azureSubscription: $(azure_subscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -e
+                cd $(Build.SourcesDirectory)
+                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
 
-              # Reinitialize Terraform with the correct backend configuration
-              terraform init -upgrade -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                             -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                             -backend-config="container_name=$(CONTAINER_NAME)" \
-                             -backend-config="key=terraform.tfstate"
+                # Reinitialize Terraform
+                terraform init -upgrade \
+                  -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
+                  -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
+                  -backend-config="container_name=$(CONTAINER_NAME)" \
+                  -backend-config="key=terraform.tfstate"
 
-              # Apply the Terraform plan
-              terraform apply -auto-approve terraform.plan
-            displayName: "Terraform Apply"
+                # Apply the Terraform plan
+                terraform apply -auto-approve terraform.plan
