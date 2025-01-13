@@ -34,6 +34,10 @@ stages:
       - job: TerraformInitAndPlanJob
         displayName: "Terraform Init and Plan"
         steps:
+          - script: |
+              sudo chmod -R 777 /home/vsts/work/1/s/.git
+            displayName: 'Fix Git Permissions'
+            
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azure_subscription)
