@@ -1,87 +1,58 @@
 trigger:
-  branches:
-    include:
-      - dev
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
 
 variables:
-  azure_subscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-  RESOURCE_GROUP_NAME: "POCMyResourceGroup"
-  STORAGE_ACCOUNT_NAME: "pocmystorageacct123"
-  CONTAINER_NAME: "tfstate"
-  LOCATION: "eastus"
-  NODE_COUNT: 2
-  AKS_NAME: "MyAKSCluster"
-  AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
-  AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
-  AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
-  AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
+  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
+  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
+  resource_group_name: "POCMyResourceGroup"
+  storage_account_name: "pocmystorageacct123"
+  container_name: "tfstate"
+  aks_name: "MyAKSCluster"
+  node_count: "2"
+  location: "East US"
 
-stages:
-  - stage: InstallTerraform
-    displayName: "Install Terraform Version 1.10.4"
-    jobs:
-      - job: InstallTerraformJob
-        displayName: "Install Terraform"
-        steps:
-          - task: TerraformInstaller@0
-            inputs:
-              terraformVersion: '1.10.4'
+steps:
+- script: |
+    echo "Logging into Azure..."
+    az login --service-principal \
+      --username $(azure_client_id) \
+      --password $(azure_client_secret) \
+      --tenant $(azure_tenant_id)
+    az account set --subscription $(azure_subscription_id)
+  displayName: "Login to Azure using Azure CLI"
 
-  - stage: TerraformInitPlanApply
-    displayName: "Initialize, Plan, and Apply Terraform"
-    dependsOn: InstallTerraform
-    jobs:
-      - job: TerraformInitPlanApplyJob
-        displayName: "Terraform Init, Plan, and Apply"
-        steps:
-          - script: |
-              sudo chmod -R 777 /home/vsts/work/1/s/.git
-            displayName: 'Fix Git Permissions'
+- script: |
+    echo "Installing Terraform..."
+    sudo apt-get update -y
+    sudo apt-get install -y gnupg software-properties-common
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+    sudo apt-get update -y
+    sudo apt-get install terraform -y
+    terraform --version
+  displayName: "Install Terraform"
 
-          - task: AzureCLI@2
-            inputs:
-              azureSubscription: $(azure_subscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-                export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-                export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-                export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+- script: |
+    echo "Initializing Terraform..."
+    terraform init \
+      -backend-config="resource_group_name=$(resource_group_name)" \
+      -backend-config="storage_account_name=$(storage_account_name)" \
+      -backend-config="container_name=$(container_name)" \
+      -backend-config="key=terraform.tfstate"
+    terraform plan -out terraform.plan
+  displayName: "Terraform Init and Plan"
 
-                cd $(Build.SourcesDirectory)
+- script: |
+    echo "Applying Terraform plan..."
+    terraform apply -auto-approve "terraform.plan"
+  displayName: "Terraform Apply"
 
-                # Remove old state and lock files
-                rm -rf .terraform .terraform.lock.hcl terraform.plan
-
-                # Initialize Terraform
-                terraform init -backend-config="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                               -backend-config="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                               -backend-config="container_name=$(CONTAINER_NAME)" \
-                               -backend-config="key=terraform.tfstate"
-
-                # Import the existing storage container
-                terraform import \
-                  azurerm_storage_container.container \
-                  "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(RESOURCE_GROUP_NAME)/providers/Microsoft.Storage/storageAccounts/$(STORAGE_ACCOUNT_NAME)/blobServices/default/containers/$(CONTAINER_NAME)" || echo "Container already imported."
-
-                # Plan and apply Terraform
-                terraform plan -out=terraform.plan -var="azure_subscription_id=$(AZURE_SUBSCRIPTION_ID)" \
-                               -var="azure_client_id=$(AZURE_CLIENT_ID)" \
-                               -var="azure_client_secret=$(AZURE_CLIENT_SECRET)" \
-                               -var="azure_tenant_id=$(AZURE_TENANT_ID)" \
-                               -var="resource_group_name=$(RESOURCE_GROUP_NAME)" \
-                               -var="storage_account_name=$(STORAGE_ACCOUNT_NAME)" \
-                               -var="container_name=$(CONTAINER_NAME)" \
-                               -var="location=$(LOCATION)" \
-                               -var="aks_name=$(AKS_NAME)" \
-                               -var="node_count=$(NODE_COUNT)"
-
-                terraform apply -auto-approve terraform.plan
-
-          - task: PublishBuildArtifacts@1
-            inputs:
-              PathtoPublish: $(Build.SourcesDirectory)
-              ArtifactName: 'terraform-plan'
-              publishLocation: 'Container'
+- script: |
+    echo "Cleaning up Azure CLI session..."
+    az account clear
+  displayName: "Clear Azure CLI session"
