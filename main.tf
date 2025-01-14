@@ -2,10 +2,10 @@ terraform {
   required_version = ">= 1.5.7, < 2.0.0"
 
   backend "azurerm" {
-    resource_group_name  = "POCMyResourceGroup"
-    storage_account_name = "pocmystorageacct123"
-    container_name       = "tfstate"
-    key                  = "terraform.tfstate"
+    resource_group_name  = var.backend_resource_group_name
+    storage_account_name = var.backend_storage_account_name
+    container_name       = var.backend_container_name
+    key                  = var.backend_key
   }
 
   required_providers {
@@ -16,7 +16,6 @@ terraform {
   }
 }
 
-# Azure Provider Configuration
 provider "azurerm" {
   features {}
 
@@ -103,6 +102,30 @@ variable "container_name" {
   type        = string
   description = "The name of the Storage Container"
   default     = "tfstate"
+}
+
+variable "backend_resource_group_name" {
+  type        = string
+  description = "The name of the Resource Group for the backend"
+  default     = "POCMyResourceGroup"
+}
+
+variable "backend_storage_account_name" {
+  type        = string
+  description = "The name of the Storage Account for the backend"
+  default     = "pocmystorageacct123"
+}
+
+variable "backend_container_name" {
+  type        = string
+  description = "The name of the Storage Container for the backend"
+  default     = "tfstate"
+}
+
+variable "backend_key" {
+  type        = string
+  description = "The key for the backend state file"
+  default     = "terraform.tfstate"
 }
 
 variable "aks_name" {
