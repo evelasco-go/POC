@@ -23,7 +23,9 @@ stages:
         # Generate the Terraform plan file
         terraform plan -out=tfplan
 
-        # Check if the plan file exists
+        # Check if the plan file exists and log the directory contents
+        echo "Listing current directory contents:"
+        ls -l
         if [ ! -f tfplan ]; then
           echo "Terraform plan failed. tfplan file not found."
           exit 1
