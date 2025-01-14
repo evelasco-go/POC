@@ -8,9 +8,9 @@ variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
 
 stages:
-- stage: TerraformDeploy
+- stage: TerraformInitPlanApply
   jobs:
-  - job: TerraformDeploy
+  - job: TerraformInitPlanApply
     steps:
     - script: |
         # Install Terraform
@@ -20,19 +20,13 @@ stages:
         # Initialize Terraform
         terraform init
 
-        # Generate the Terraform plan and apply it directly
+        # Generate the Terraform plan
         terraform plan -out=tfplan
-        terraform apply -auto-approve tfplan
 
-        # Check if the tfplan file exists and log the directory contents
-        echo "Listing current directory contents:"
-        ls -l
-        if [ ! -f tfplan ]; then
-          echo "Terraform plan failed. tfplan file not found."
-          exit 1
-        fi
-      displayName: 'Terraform Init, Plan, and Apply'
-      workingDirectory: $(Build.SourcesDirectory)  # Root directory of your repo
+        # Apply the Terraform configuration
+        terraform apply -auto-approve tfplan
+      displayName: 'Initialize, Plan, and Apply Terraform'
+      workingDirectory: $(Build.SourcesDirectory)
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
