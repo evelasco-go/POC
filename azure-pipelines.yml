@@ -20,38 +20,57 @@ stages:
         # Initialize Terraform
         terraform init
 
+        # Import existing resources into Terraform state
+        terraform import azurerm_resource_group.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup
+        terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster
+        terraform import azurerm_storage_account.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123
+        terraform import azurerm_storage_container.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123/blobServices/default/containers/tfstate
+        terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.OperationalInsights/workspaces/goreg-test-analytics-workspace2
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster|aks-metrics-diagnostic-setting"
+       
         # Run Terraform Plan
         terraform plan -out=tfplan
 
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
-      displayName: 'Install Terraform, Initialize, Plan, and Apply'
-      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
+      displayName: 'Install Terraform, Initialize, Plan, Import, and Apply'
+      workingDirectory: $(Build.SourcesDirectory)
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
         AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
         AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
-- stage: InstallGrafana
+- stage: DeployGrafana
+  dependsOn: Terraform
   jobs:
-  - job: InstallGrafana
+  - job: HelmDeployment
     steps:
     - script: |
         # Install Helm
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
-        # Add Grafana Helm repo and install Grafana
+        # Add the Grafana Helm chart repository
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
-        helm install grafana grafana/grafana --namespace monitoring --create-namespace
-      displayName: 'Install Helm and Grafana'
 
-- stage: EnableMonitoring
+        # Install Grafana in the Kubernetes cluster
+        helm install grafana grafana/grafana \
+          --namespace monitoring \
+          --create-namespace \
+          --set adminPassword='yourpassword' \
+          --set service.type=LoadBalancer
+      displayName: 'Deploy Grafana via Helm'
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        KUBECONFIG: $(KUBE_CONFIG)
+
+- stage: ApplyTerraform
   jobs:
-  - job: EnableMonitoring
+  - job: Apply
     steps:
     - script: |
-        # Enable Azure Monitor for AKS using Terraform
+        # Run Terraform Apply
         terraform apply -auto-approve
-      displayName: 'Enable Azure Monitor for AKS'
+      displayName: 'Apply Terraform Configuration'
+      workingDirectory: $(Build.SourcesDirectory)
