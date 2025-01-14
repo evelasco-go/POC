@@ -29,11 +29,11 @@ stages:
       vmImage: 'ubuntu-22.04'
     steps:
     
-    # Install Terraform manually
+    # Install Terraform using snap
     - script: |
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        sudo apt update
-        sudo apt install terraform=${{ variables.terraform_version }} -y
+        sudo apt-get update
+        sudo apt-get install -y snapd
+        sudo snap install terraform --classic
       displayName: 'Install Terraform'
 
     # Check Terraform version to confirm successful installation
