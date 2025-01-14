@@ -19,7 +19,15 @@ stages:
 
         # Initialize Terraform
         terraform init
+
+        # Generate the Terraform plan file
         terraform plan -out=tfplan
+
+        # Check if the plan file exists
+        if [ ! -f tfplan ]; then
+          echo "Terraform plan failed. tfplan file not found."
+          exit 1
+        fi
       displayName: 'Install Terraform and Initialize'
       workingDirectory: $(Build.SourcesDirectory)  # Root directory of your repo
       env:
@@ -33,6 +41,12 @@ stages:
   - job: TerraformApply
     steps:
     - script: |
+        # Check if tfplan file exists before applying
+        if [ ! -f tfplan ]; then
+          echo "tfplan file does not exist. Exiting..."
+          exit 1
+        fi
+
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
       displayName: 'Apply Terraform Configuration'
