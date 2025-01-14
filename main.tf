@@ -1,10 +1,10 @@
 # Provider and authentication setup
 provider "azurerm" {
   features {}
-  client_id       = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
-  client_secret   = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
-  tenant_id       = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  subscription_id = "15e60859-88d7-4c84-943f-55488479910c"
+  client_id       = var.azure_client_id
+  client_secret   = var.azure_client_secret
+  tenant_id       = var.azure_tenant_id
+  subscription_id = var.azure_subscription_id
 }
 
 # Declare variables used in the configuration
@@ -24,6 +24,26 @@ variable "resource_group_name" {
   description = "Resource group for the AKS cluster"
   type        = string
   default     = "myResourceGroup"
+}
+
+variable "azure_client_id" {
+  description = "Azure Client ID"
+  type        = string
+}
+
+variable "azure_client_secret" {
+  description = "Azure Client Secret"
+  type        = string
+}
+
+variable "azure_tenant_id" {
+  description = "Azure Tenant ID"
+  type        = string
+}
+
+variable "azure_subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
 }
 
 # Create the resource group
@@ -52,6 +72,6 @@ resource "azurerm_kubernetes_cluster" "example" {
 
 # Output the kubeconfig (marked as sensitive)
 output "kubeconfig" {
-  value     = azurerm_kubernetes_cluster.example.kube_config.0.raw_kube_config
+  value     = azurerm_kubernetes_cluster.example.kube_config[0].raw_kube_config
   sensitive = true
 }
