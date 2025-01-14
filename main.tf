@@ -1,3 +1,4 @@
+# Provider and authentication setup
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -117,16 +118,16 @@ resource "azurerm_storage_container" "example" {
 
 # Declare new Log Analytics workspace
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = "goreg-test-analytics-workspace2"  # Name of the new workspace
-  location            = var.location                      # Location for the workspace
-  resource_group_name = azurerm_resource_group.example.name  # Resource group for the workspace
-  sku                 = "PerGB2018"                       # SKU for the workspace
+  name                = "goreg-test-analytics-workspace2"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.example.name
+  sku                 = "PerGB2018"
 }
 
 # Create the metrics diagnostic setting
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name               = "aks-metrics-diagnostic-setting"
-  target_resource_id = azurerm_kubernetes_cluster.example.id  # AKS cluster ID
+  target_resource_id = azurerm_kubernetes_cluster.example.id
 
   metric {
     category = "AllMetrics"
