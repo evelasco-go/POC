@@ -21,7 +21,7 @@ stages:
         terraform init
         terraform plan -out=tfplan
       displayName: 'Install Terraform and Initialize'
-      workingDirectory: $(System.DefaultWorkingDirectory)/terraform
+      workingDirectory: $(Build.SourcesDirectory)/terraform
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
@@ -36,7 +36,7 @@ stages:
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
       displayName: 'Apply Terraform Configuration'
-      workingDirectory: $(System.DefaultWorkingDirectory)/terraform
+      workingDirectory: $(Build.SourcesDirectory)/terraform
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
