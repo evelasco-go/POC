@@ -1,85 +1,44 @@
 trigger:
-  tags:
-    include:
-    - dev1-*
-
-pr: none  # Disable automatic PR trigger    
+- dev
 
 pool:
-  vmImage: 'ubuntu-22.04'  # Use an Ubuntu image that can support Terraform
+  vmImage: 'ubuntu-latest'
 
 variables:
-  subscription_id: '15e60859-88d7-4c84-943f-55488479910c'
-  client_id: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
-  client_secret: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
-  tenant_id: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
-  resource_group_name: 'POCMyResourceGroup'
-  storage_account_name: 'pocmystorageacct123'
-  container_name: 'tfstate'
-  terraform_version: '1.10.4'
-  backend_key: 'terraform.tfstate'
+  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
 
 stages:
-- stage: Build
-  displayName: 'Build and Terraform Apply'
+- stage: TerraformInit
   jobs:
-  - job: TerraformBuild
-    displayName: 'Terraform Build'
-    pool:
-      vmImage: 'ubuntu-22.04'
+  - job: TerraformInit
     steps:
-    
-    # Install Terraform using snap
     - script: |
-        sudo apt-get update
-        sudo apt-get install -y snapd
-        sudo snap install terraform --classic
-      displayName: 'Install Terraform'
+        # Install Terraform
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        sudo apt update && sudo apt install terraform
 
-    # Check Terraform version to confirm successful installation
-    - script: terraform --version
-      displayName: 'Check Terraform Version'
+        # Initialize Terraform
+        terraform init
+        terraform plan -out=tfplan
+      displayName: 'Install Terraform and Initialize'
+      workingDirectory: $(System.DefaultWorkingDirectory)/terraform
+      env:
+        AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
+        AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
+        AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
+        AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
-    # Initialize Terraform
-    - task: TerraformInstaller@0
-      inputs:
-        terraformVersion: '${{ variables.terraform_version }}'
-
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform : init'
-      inputs:
-        workingDirectory: 'aks-terraform-test'
-        backendServiceArm: 'GOREG-TEST'
-        backendAzureRmResourceGroupName: '${{ variables.resource_group_name }}'
-        backendAzureRmStorageAccountName: '${{ variables.storage_account_name }}'
-        backendAzureRmContainerName: '${{ variables.container_name }}'
-        backendAzureRmKey: '${{ variables.backend_key }}'
-        backendAzureRmSubscriptionId: '${{ variables.subscription_id }}'
-        backendAzureRmClientId: '${{ variables.client_id }}'
-        backendAzureRmClientSecret: '${{ variables.client_secret }}'
-        backendAzureRmTenantId: '${{ variables.tenant_id }}'
-
-    # Validate Terraform configuration
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform : validate'
-      inputs:
-        command: 'validate'
-        workingDirectory: 'aks-terraform-test'
-
-    # Plan Terraform changes
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform : plan'
-      inputs:
-        command: 'plan'
-        workingDirectory: 'aks-terraform-test'
-        commandOptions: '-out=tfplan'
-        environmentServiceNameAzureRM: 'GOREG-TEST'
-
-    # Apply Terraform plan
-    - task: TerraformTaskV4@4
-      displayName: 'Terraform : apply'
-      inputs:
-        command: 'apply'
-        workingDirectory: 'aks-terraform-test'
-        commandOptions: '-auto-approve'
-        environmentServiceNameAzureRM: 'GOREG-TEST'
+- stage: TerraformApply
+  jobs:
+  - job: TerraformApply
+    steps:
+    - script: |
+        # Apply the Terraform configuration
+        terraform apply -auto-approve tfplan
+      displayName: 'Apply Terraform Configuration'
+      workingDirectory: $(System.DefaultWorkingDirectory)/terraform
+      env:
+        AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
+        AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
+        AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
+        AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
