@@ -2,10 +2,10 @@ terraform {
   required_version = ">= 1.5.7, < 2.0.0"
 
   backend "azurerm" {
-    resource_group_name  = var.backend_resource_group_name
-    storage_account_name = var.backend_storage_account_name
-    container_name       = var.backend_container_name
-    key                  = var.backend_key
+    resource_group_name  = "POCMyResourceGroup"
+    storage_account_name = "pocmystorageacct123"
+    container_name       = "tfstate"
+    key                  = "terraform.tfstate"
   }
 
   required_providers {
@@ -16,24 +16,25 @@ terraform {
   }
 }
 
+# Azure Provider Configuration
 provider "azurerm" {
   features {}
 
-  subscription_id = var.azure_subscription_id
-  client_id       = var.azure_client_id
-  client_secret   = var.azure_client_secret
-  tenant_id       = var.azure_tenant_id
+  subscription_id = "15e60859-88d7-4c84-943f-55488479910c"
+  client_id       = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  client_secret   = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  tenant_id       = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
 }
 
 # Resource Group
 resource "azurerm_resource_group" "rg" {
-  name     = var.resource_group_name
-  location = var.location
+  name     = "POCMyResourceGroup"
+  location = "eastus"
 }
 
 # Storage Account
 resource "azurerm_storage_account" "storage" {
-  name                     = var.storage_account_name
+  name                     = "pocmystorageacct123"
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
@@ -42,106 +43,25 @@ resource "azurerm_storage_account" "storage" {
 
 # Storage Container
 resource "azurerm_storage_container" "container" {
-  name                  = var.container_name
+  name                  = "tfstate"
   storage_account_name  = azurerm_storage_account.storage.name
   container_access_type = "private"
 }
 
 # Azure Kubernetes Cluster (AKS)
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                = var.aks_name
+  name                = "example-aks-cluster"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "${var.aks_name}-dns"
+  dns_prefix          = "example-aks-cluster-dns"
 
   default_node_pool {
     name       = "default"
-    node_count = var.node_count
+    node_count = 2
     vm_size    = "Standard_DS2_v2"
   }
 
   identity {
     type = "SystemAssigned"
   }
-}
-
-# Variables
-variable "azure_subscription_id" {
-  type        = string
-  description = "The Azure Subscription ID"
-}
-
-variable "azure_client_id" {
-  type        = string
-  description = "The Azure Client ID"
-}
-
-variable "azure_client_secret" {
-  type        = string
-  description = "The Azure Client Secret"
-}
-
-variable "azure_tenant_id" {
-  type        = string
-  description = "The Azure Tenant ID"
-}
-
-variable "resource_group_name" {
-  type        = string
-  description = "The name of the Resource Group"
-  default     = "POCMyResourceGroup"
-}
-
-variable "storage_account_name" {
-  type        = string
-  description = "The name of the Storage Account"
-  default     = "pocmystorageacct123"
-}
-
-variable "container_name" {
-  type        = string
-  description = "The name of the Storage Container"
-  default     = "tfstate"
-}
-
-variable "backend_resource_group_name" {
-  type        = string
-  description = "The name of the Resource Group for the backend"
-  default     = "POCMyResourceGroup"
-}
-
-variable "backend_storage_account_name" {
-  type        = string
-  description = "The name of the Storage Account for the backend"
-  default     = "pocmystorageacct123"
-}
-
-variable "backend_container_name" {
-  type        = string
-  description = "The name of the Storage Container for the backend"
-  default     = "tfstate"
-}
-
-variable "backend_key" {
-  type        = string
-  description = "The key for the backend state file"
-  default     = "terraform.tfstate"
-}
-
-variable "aks_name" {
-  type        = string
-  description = "The name of the AKS Cluster"
-  default     = "example-aks-cluster"
-}
-
-variable "node_count" {
-  type        = number
-  description = "The number of nodes in the AKS cluster"
-  default     = 2
-}
-
-variable "location" {
-  type        = string
-  description = "The Azure region for resources"
-  default     = "eastus"
 }
