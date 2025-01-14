@@ -34,44 +34,38 @@ stages:
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
       displayName: 'Install Terraform, Initialize, Plan, Import, and Apply'
+      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
         AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
         AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
-- stage: DeployGrafana
+- stage: DeployMonitoring
   dependsOn: Terraform
   jobs:
   - job: HelmDeployment
     steps:
     - script: |
-        # Log in to Azure
-        az login --service-principal \
-          --username $(AZURE_CLIENT_ID) \
-          --password $(AZURE_CLIENT_SECRET) \
-          --tenant $(AZURE_TENANT_ID)
+        # Ensure kubeconfig content is set
+        mkdir -p ~/.kube
+        echo "$KUBECONFIG" > ~/.kube/config
+        chmod 600 ~/.kube/config
 
-        # Set Azure subscription
-        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
-
-        # Set up kubeconfig for AKS
-        az aks get-credentials --resource-group POCMyResourceGroup --name MyAKSCluster --overwrite-existing
-
-        # Verify Kubernetes cluster connection
+        # Verify cluster connection
         kubectl cluster-info
 
         # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
-        # Add Grafana Helm chart repository
+        # Add Prometheus and Grafana Helm repositories
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
 
-        # Deploy Grafana using Helm
-        helm install grafana grafana/grafana \
-          --namespace monitoring \
-          --create-namespace \
-          --set adminPassword='yourpassword' \
-          --set service.type=LoadBalancer
-      displayName: 'Set Up kubeconfig and Deploy Grafana via Helm'
+        # Install Prometheus and Grafana
+        helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer
+      displayName: 'Install Prometheus and Grafana via Helm'
+      env:
+        KUBECONFIG: $(kubeconfig)  # Ensure kubeconfig content is passed
