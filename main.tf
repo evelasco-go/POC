@@ -1,15 +1,18 @@
-# Provider Configuration
 provider "azurerm" {
   features {}
+
+  # Hardcoded Azure credentials
+  client_id       = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  client_secret   = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  tenant_id       = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
+  subscription_id = "15e60859-88d7-4c84-943f-55488479910c"
 }
 
-# Resource Group
 resource "azurerm_resource_group" "rg" {
   name     = "rg-akstest"
   location = "East US"
 }
 
-# Storage Account
 resource "azurerm_storage_account" "storage" {
   name                     = "aksstoragedemo"
   resource_group_name       = azurerm_resource_group.rg.name
@@ -18,7 +21,6 @@ resource "azurerm_storage_account" "storage" {
   account_replication_type = "LRS"
 }
 
-# Azure Kubernetes Service (AKS)
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = "aks-demo"
   location            = azurerm_resource_group.rg.location
@@ -40,7 +42,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 }
 
-# Output the AKS cluster kubeconfig
 output "kubeconfig" {
   value = azurerm_kubernetes_cluster.aks.kube_config_raw
 }
