@@ -134,7 +134,7 @@ resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
     enabled  = true
   }
 
-  logs {
+  log {
     category = "AuditLogs"    # Adjust the category as per your requirement
     enabled  = true
   }
@@ -142,3 +142,4 @@ resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
   log_analytics_workspace_id     = azurerm_log_analytics_workspace.example.id  # Log Analytics Workspace ID
   log_analytics_destination_type = "Dedicated"  # This specifies where the logs will go (Dedicated workspace)
 }
+
