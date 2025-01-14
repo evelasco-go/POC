@@ -50,11 +50,11 @@ stages:
         # Azure Login (Ensure you're logged in with the correct subscription)
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         
-        # Use Subscription ID instead of Name
+        # Use Subscription ID
         az account set --subscription "15e60859-88d7-4c84-943f-55488479910c"
 
         # Get AKS credentials for kubectl and Helm
-        az aks get-credentials --resource-group <resource-group-name> --name <aks-cluster-name>
+        az aks get-credentials --resource-group "POCMyResourceGroup" --name "MyAKSCluster"
 
         # Ensure kubeconfig content is set
         mkdir -p ~/.kube
