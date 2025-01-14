@@ -8,9 +8,9 @@ variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
 
 stages:
-- stage: TerraformInit
+- stage: TerraformDeploy
   jobs:
-  - job: TerraformInit
+  - job: TerraformDeploy
     steps:
     - script: |
         # Install Terraform
@@ -20,40 +20,18 @@ stages:
         # Initialize Terraform
         terraform init
 
-        # Generate the Terraform plan file
+        # Generate the Terraform plan and apply it directly
         terraform plan -out=tfplan
+        terraform apply -auto-approve tfplan
 
-        # Check if the plan file exists and log the directory contents
+        # Check if the tfplan file exists and log the directory contents
         echo "Listing current directory contents:"
         ls -l
         if [ ! -f tfplan ]; then
           echo "Terraform plan failed. tfplan file not found."
           exit 1
         fi
-      displayName: 'Install Terraform and Initialize'
-      workingDirectory: $(Build.SourcesDirectory)  # Root directory of your repo
-      env:
-        AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
-        AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
-        AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
-        AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
-
-- stage: TerraformApply
-  jobs:
-  - job: TerraformApply
-    steps:
-    - script: |
-        # Check if tfplan file exists before applying
-        echo "Listing current directory contents in TerraformApply:"
-        ls -l
-        if [ ! -f $(Build.SourcesDirectory)/tfplan ]; then
-          echo "tfplan file does not exist. Exiting..."
-          exit 1
-        fi
-
-        # Apply the Terraform configuration
-        terraform apply -auto-approve $(Build.SourcesDirectory)/tfplan
-      displayName: 'Apply Terraform Configuration'
+      displayName: 'Terraform Init, Plan, and Apply'
       workingDirectory: $(Build.SourcesDirectory)  # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
