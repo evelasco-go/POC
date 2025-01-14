@@ -1,11 +1,23 @@
 trigger:
   tags:
     include:
-      - dev1-*
-pr: none
+    - dev1-*
+
+pr: none  # Disable automatic PR trigger    
 
 pool:
-  name: Azure Pipelines
+  vmImage: 'ubuntu-22.04'  # Use an Ubuntu image that can support Terraform
+
+variables:
+  subscription_id: '15e60859-88d7-4c84-943f-55488479910c'
+  client_id: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
+  client_secret: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
+  tenant_id: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
+  resource_group_name: 'POCMyResourceGroup'
+  storage_account_name: 'pocmystorageacct123'
+  container_name: 'tfstate'
+  terraform_version: '1.10.4'
+  backend_key: 'terraform.tfstate'
 
 stages:
 - stage: Build
@@ -16,30 +28,58 @@ stages:
     pool:
       vmImage: 'ubuntu-22.04'
     steps:
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@1
+    
+    # Install Terraform manually
+    - script: |
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        sudo apt update
+        sudo apt install terraform=${{ variables.terraform_version }} -y
       displayName: 'Install Terraform'
 
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
+    # Check Terraform version to confirm successful installation
+    - script: terraform --version
+      displayName: 'Check Terraform Version'
+
+    # Initialize Terraform
+    - task: TerraformInstaller@0
+      inputs:
+        terraformVersion: '${{ variables.terraform_version }}'
+
+    - task: TerraformTaskV4@4
       displayName: 'Terraform : init'
       inputs:
-        command: 'init'
         workingDirectory: 'aks-terraform-test'
         backendServiceArm: 'GOREG-TEST'
-        backendAzureRmResourceGroupName: 'POCMyResourceGroup'
-        backendAzureRmStorageAccountName: 'pocmystorageacct123'
-        backendAzureRmContainerName: 'tfstate'
-        backendAzureRmKey: 'terraform.tfstate'
+        backendAzureRmResourceGroupName: '${{ variables.resource_group_name }}'
+        backendAzureRmStorageAccountName: '${{ variables.storage_account_name }}'
+        backendAzureRmContainerName: '${{ variables.container_name }}'
+        backendAzureRmKey: '${{ variables.backend_key }}'
+        backendAzureRmSubscriptionId: '${{ variables.subscription_id }}'
+        backendAzureRmClientId: '${{ variables.client_id }}'
+        backendAzureRmClientSecret: '${{ variables.client_secret }}'
+        backendAzureRmTenantId: '${{ variables.tenant_id }}'
 
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
+    # Validate Terraform configuration
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform : validate'
+      inputs:
+        command: 'validate'
+        workingDirectory: 'aks-terraform-test'
+
+    # Plan Terraform changes
+    - task: TerraformTaskV4@4
       displayName: 'Terraform : plan'
       inputs:
         command: 'plan'
         workingDirectory: 'aks-terraform-test'
         commandOptions: '-out=tfplan'
+        environmentServiceNameAzureRM: 'GOREG-TEST'
 
-    - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskV4@4
+    # Apply Terraform plan
+    - task: TerraformTaskV4@4
       displayName: 'Terraform : apply'
       inputs:
         command: 'apply'
         workingDirectory: 'aks-terraform-test'
-        commandOptions: '-auto-approve -input=false -out=tfplan'
+        commandOptions: '-auto-approve'
+        environmentServiceNameAzureRM: 'GOREG-TEST'
