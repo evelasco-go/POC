@@ -96,7 +96,7 @@ resource "azurerm_kubernetes_cluster" "example" {
 
 # Output the kubeconfig (updated to reflect correct attribute)
 output "kubeconfig" {
-  value     = azurerm_kubernetes_cluster.example.kube_config[0].value
+  value     = azurerm_kubernetes_cluster.example.kube_config
   sensitive = true
 }
 
