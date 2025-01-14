@@ -46,6 +46,18 @@ variable "azure_subscription_id" {
   type        = string
 }
 
+variable "container_name" {
+  description = "Name of the storage container"
+  type        = string
+  default     = "mycontainer"
+}
+
+variable "storage_account_name" {
+  description = "Name of the storage account"
+  type        = string
+  default     = "mystorageaccount"
+}
+
 # Create the resource group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
@@ -74,4 +86,20 @@ resource "azurerm_kubernetes_cluster" "example" {
 output "kubeconfig" {
   value     = azurerm_kubernetes_cluster.example.kube_config[0].raw_kube_config
   sensitive = true
+}
+
+# Create the storage account (for example)
+resource "azurerm_storage_account" "example" {
+  name                     = var.storage_account_name
+  resource_group_name      = azurerm_resource_group.example.name
+  location                 = var.aks_location
+  account_tier              = "Standard"
+  account_replication_type = "LRS"
+}
+
+# Create the storage container (for example)
+resource "azurerm_storage_container" "example" {
+  name                  = var.container_name
+  storage_account_name  = azurerm_storage_account.example.name
+  container_access_type = "private"
 }
