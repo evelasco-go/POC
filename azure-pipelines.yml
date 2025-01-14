@@ -17,10 +17,6 @@ stages:
         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
         sudo apt update && sudo apt install terraform
 
-        # Check the directory structure
-        echo "Current directory structure:"
-        ls -R $(Build.SourcesDirectory)
-
         # Initialize Terraform
         terraform init
         terraform plan -out=tfplan
