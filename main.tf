@@ -1,4 +1,3 @@
-# Provider and authentication setup
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -11,7 +10,7 @@ provider "azurerm" {
 variable "aks_name" {
   description = "Name of the AKS cluster"
   type        = string
-  default     = "Goreg-Dev-Cluster"  # Updated AKS name
+  default     = "myakscluster"
 }
 
 variable "aks_location" {
@@ -23,7 +22,7 @@ variable "aks_location" {
 variable "resource_group_name" {
   description = "Resource group for the AKS cluster"
   type        = string
-  default     = "POCMyResourceGroup"  # Updated resource group name
+  default     = "myResourceGroup"
 }
 
 variable "azure_client_id" {
@@ -44,7 +43,6 @@ variable "azure_tenant_id" {
 variable "azure_subscription_id" {
   description = "Azure Subscription ID"
   type        = string
-  default     = "15e60859-88d7-4c84-943f-55488479910c"  # Updated subscription ID
 }
 
 variable "container_name" {
