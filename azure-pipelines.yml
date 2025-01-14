@@ -15,7 +15,7 @@ stages:
     - script: |
         # Install Terraform
         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        sudo apt update && sudo apt install terraform -y
+        sudo apt update && sudo apt install terraform
 
         # Initialize Terraform
         terraform init
@@ -47,8 +47,13 @@ stages:
   - job: HelmDeployment
     steps:
     - script: |
-        # Set up Kubeconfig
+        # Ensure kubeconfig content is set
+        mkdir -p ~/.kube
         echo "$KUBECONFIG" > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+        # Verify cluster connection
+        kubectl cluster-info
 
         # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
@@ -64,6 +69,5 @@ stages:
           --set adminPassword='yourpassword' \
           --set service.type=LoadBalancer
       displayName: 'Deploy Grafana via Helm'
-      workingDirectory: $(Build.SourcesDirectory)
       env:
-        KUBECONFIG: $(kubeconfig)  # Ensure kubeconfig is available in the pipeline context
+        KUBECONFIG: $(kubeconfig)  # Ensure kubeconfig content is passed
