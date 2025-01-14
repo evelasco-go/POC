@@ -142,11 +142,10 @@ resource "azurerm_monitor_diagnostic_setting" "aks_logs" {
   name               = "aks-logs-diagnostic-setting"
   target_resource_id = azurerm_kubernetes_cluster.example.id  # AKS cluster ID
 
-  log {
+  logs {
     category = "AuditLogs"
     enabled  = true
   }
 
   log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
-
