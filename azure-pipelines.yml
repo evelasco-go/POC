@@ -17,11 +17,15 @@ stages:
         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
         sudo apt update && sudo apt install terraform
 
+        # Check the directory structure
+        echo "Current directory structure:"
+        ls -R $(Build.SourcesDirectory)
+
         # Initialize Terraform
         terraform init
         terraform plan -out=tfplan
       displayName: 'Install Terraform and Initialize'
-      workingDirectory: $(Build.SourcesDirectory)/terraform
+      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
@@ -36,7 +40,7 @@ stages:
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
       displayName: 'Apply Terraform Configuration'
-      workingDirectory: $(Build.SourcesDirectory)/terraform
+      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
