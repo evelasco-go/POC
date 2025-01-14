@@ -96,7 +96,7 @@ resource "azurerm_kubernetes_cluster" "example" {
 
 # Output the kubeconfig (updated to reflect correct attribute)
 output "kubeconfig" {
-  value     = azurerm_kubernetes_cluster.example.kube_config_raw
+  value     = azurerm_kubernetes_cluster.example.kube_config
   sensitive = true
 }
 
@@ -116,17 +116,17 @@ resource "azurerm_storage_container" "example" {
   container_access_type = "private"
 }
 
-# Create the Log Analytics Workspace
+# Declare new Log Analytics workspace
 resource "azurerm_log_analytics_workspace" "example" {
   name                = "goreg-test-analytics-workspace2"  # Name of the new workspace
-  location            = var.location                        # Location for the workspace
+  location            = var.location                      # Location for the workspace
   resource_group_name = azurerm_resource_group.example.name  # Resource group for the workspace
-  sku                 = "PerGB2018"                         # SKU for the workspace
+  sku                 = "PerGB2018"                       # SKU for the workspace
 }
 
 # Create the Diagnostic Settings for AKS
 resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
-  name               = "aks-diagnostic-setting"            # Name of the diagnostic setting
+  name               = "aks-diagnostic-setting"             # Name of the diagnostic setting
   target_resource_id = azurerm_kubernetes_cluster.example.id  # AKS cluster ID
 
   metric {
@@ -134,7 +134,7 @@ resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
     enabled  = true
   }
 
-  log {
+  logs {
     category = "AuditLogs"    # You can adjust the category as per your requirement
     enabled  = true
   }
