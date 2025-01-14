@@ -34,7 +34,6 @@ stages:
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
       displayName: 'Install Terraform, Initialize, Plan, Import, and Apply'
-      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
@@ -47,12 +46,19 @@ stages:
   - job: HelmDeployment
     steps:
     - script: |
-        # Ensure kubeconfig content is set
-        mkdir -p ~/.kube
-        echo "$KUBECONFIG" > ~/.kube/config
-        chmod 600 ~/.kube/config
+        # Log in to Azure
+        az login --service-principal \
+          --username $(AZURE_CLIENT_ID) \
+          --password $(AZURE_CLIENT_SECRET) \
+          --tenant $(AZURE_TENANT_ID)
 
-        # Verify cluster connection
+        # Set Azure subscription
+        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+
+        # Set up kubeconfig for AKS
+        az aks get-credentials --resource-group POCMyResourceGroup --name MyAKSCluster --overwrite-existing
+
+        # Verify Kubernetes cluster connection
         kubectl cluster-info
 
         # Install Helm
@@ -68,6 +74,4 @@ stages:
           --create-namespace \
           --set adminPassword='yourpassword' \
           --set service.type=LoadBalancer
-      displayName: 'Deploy Grafana via Helm'
-      env:
-        KUBECONFIG: $(kubeconfig)  # Ensure kubeconfig content is passed
+      displayName: 'Set Up kubeconfig and Deploy Grafana via Helm'
