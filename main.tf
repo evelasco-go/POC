@@ -126,20 +126,21 @@ resource "azurerm_log_analytics_workspace" "example" {
 
 # Create the Diagnostic Settings for AKS
 resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
-  name               = "aks-diagnostic-setting"             # Name of the diagnostic setting
+  name               = "aks-diagnostic-setting"
   target_resource_id = azurerm_kubernetes_cluster.example.id  # AKS cluster ID
 
   metric {
-    category = "AllMetrics"  # Enable all metrics for monitoring
+    category = "AllMetrics"
     enabled  = true
   }
 
-  log {
-    category = "AuditLogs"    # Adjust the category as per your requirement
+  logs {
+    category = "AuditLogs"
     enabled  = true
   }
 
   log_analytics_workspace_id     = azurerm_log_analytics_workspace.example.id  # Log Analytics Workspace ID
-  log_analytics_destination_type = "Dedicated"  # This specifies where the logs will go (Dedicated workspace)
+  log_analytics_destination_type = "Dedicated"
 }
+
 
