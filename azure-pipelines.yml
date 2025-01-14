@@ -20,15 +20,17 @@ stages:
         # Initialize Terraform
         terraform init
 
-        # Import existing Resource Group into Terraform state
+        # Import existing resources into Terraform state
         terraform import azurerm_resource_group.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup
+        terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster
+        terraform import azurerm_storage_account.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123
 
         # Run Terraform Plan
         terraform plan -out=tfplan
 
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
-      displayName: 'Install Terraform, Initialize, Plan, and Apply'
+      displayName: 'Install Terraform, Initialize, Plan, Import, and Apply'
       workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
