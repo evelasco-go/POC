@@ -134,7 +134,7 @@ resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
     enabled  = true
   }
 
-  log {
+  logs {
     category = "AuditLogs"    # Adjust the category as per your requirement
     enabled  = true
   }
