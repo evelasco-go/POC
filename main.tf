@@ -124,9 +124,9 @@ resource "azurerm_log_analytics_workspace" "example" {
   sku                 = "PerGB2018"                       # SKU for the workspace
 }
 
-# Create the Diagnostic Settings for AKS
-resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
-  name               = "aks-diagnostic-setting"
+# Create the metrics diagnostic setting
+resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
+  name               = "aks-metrics-diagnostic-setting"
   target_resource_id = azurerm_kubernetes_cluster.example.id  # AKS cluster ID
 
   metric {
@@ -134,13 +134,19 @@ resource "azurerm_monitor_diagnostic_setting" "aks_monitoring" {
     enabled  = true
   }
 
-  logs {
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+}
+
+# Create the logs diagnostic setting
+resource "azurerm_monitor_diagnostic_setting" "aks_logs" {
+  name               = "aks-logs-diagnostic-setting"
+  target_resource_id = azurerm_kubernetes_cluster.example.id  # AKS cluster ID
+
+  log {
     category = "AuditLogs"
     enabled  = true
   }
 
-  log_analytics_workspace_id     = azurerm_log_analytics_workspace.example.id  # Log Analytics Workspace ID
-  log_analytics_destination_type = "Dedicated"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
-
 
