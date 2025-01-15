@@ -26,6 +26,9 @@ stages:
         echo "Waiting for 60 seconds..."
         sleep 60
 
+        # Remove existing state of the diagnostic setting if needed (run this only if import fails)
+        terraform state rm azurerm_monitor_diagnostic_setting.aks_metrics || true
+        
         # Import existing resources into Terraform state
         terraform import azurerm_resource_group.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup
         terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster
@@ -33,15 +36,12 @@ stages:
         terraform import azurerm_storage_container.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123/blobServices/default/containers/tfstate
         terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.OperationalInsights/workspaces/goreg-test-analytics-workspace2
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster|aks-metrics-diagnostic-setting"
-        
-        # Refresh Terraform state
-        terraform refresh
 
         # Run Terraform Plan
         terraform plan -out=tfplan
 
         # Apply the Terraform configuration
-        terraform apply -auto-approve tfplan
+        terraform apply -auto-approve -refresh=false tfplan
       displayName: 'Install Terraform, Initialize, Wait, Import, and Apply'
       workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
