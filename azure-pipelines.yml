@@ -9,43 +9,38 @@ variables:
 
 stages:
 - stage: Terraform
-  displayName: "Terraform Stage"
   jobs:
   - job: Terraform
-    displayName: "Terraform Initialization and Apply"
     steps:
     - script: |
-        # Install Terraform
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        sudo apt update && sudo apt install terraform
-      displayName: 'Install Terraform'
+        # Install Terraform using Snap
+        sudo snap install terraform --classic
+        
+        # Verify Terraform installation
+        terraform version
 
-    - script: |
         # Initialize Terraform
         terraform init
-        
-        # Wait for resources to stabilize
-        echo "Waiting for resources to stabilize..."
-        sleep 60  # Pause for 60 seconds to ensure resources are created
+
+        # Wait for 60 seconds to ensure resources are ready
+        echo "Waiting for 60 seconds..."
+        sleep 60
 
         # Import existing resources into Terraform state
-        echo "Importing existing resources into Terraform state..."
         terraform import azurerm_resource_group.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup
         terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster
         terraform import azurerm_storage_account.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123
         terraform import azurerm_storage_container.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123/blobServices/default/containers/tfstate
         terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.OperationalInsights/workspaces/goreg-test-analytics-workspace2
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster|aks-metrics-diagnostic-setting"
-      displayName: 'Import Resources'
-
-    - script: |
+        
         # Run Terraform Plan
         terraform plan -out=tfplan
 
         # Apply the Terraform configuration
         terraform apply -auto-approve tfplan
-      displayName: 'Plan and Apply Terraform Configuration'
-      workingDirectory: $(Build.SourcesDirectory)
+      displayName: 'Install Terraform, Initialize, Wait, Import, and Apply'
+      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
       env:
         AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
         AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
@@ -53,16 +48,14 @@ stages:
         AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
 
 - stage: DeployMonitoring
-  displayName: "Deploy Monitoring Tools"
   dependsOn: Terraform
   jobs:
   - job: HelmDeployment
-    displayName: "Helm Deployment of Prometheus and Grafana"
     steps:
     - script: |
-        # Azure Login
+        # Azure Login (Ensure you're logged in with the correct subscription)
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-
+        
         # Use Subscription ID
         az account set --subscription "15e60859-88d7-4c84-943f-55488479910c"
 
@@ -77,7 +70,7 @@ stages:
         # Verify cluster connection
         kubectl cluster-info
 
-        # Install Helm
+        # Install Helm using script
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
         # Add Prometheus and Grafana Helm repositories
