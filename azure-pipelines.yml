@@ -9,15 +9,25 @@ variables:
 
 stages:
 - stage: Terraform
+  displayName: 'Terraform Stage'
   jobs:
   - job: Terraform
+    displayName: 'Terraform Deployment'
     steps:
+    - script: |
+        # Login to Azure using Service Principal
+        az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+        
+        # Set Azure Subscription
+        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+      displayName: 'Azure CLI Login'
+
     - script: |
         # Install Terraform
         sudo apt-get update && sudo apt-get install -y unzip curl
         curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
         echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-        sudo apt-get update && sudo apt-get install terraform
+        sudo apt-get update && sudo apt-get install terraform -y
 
         # Verify Terraform installation
         terraform version
@@ -25,61 +35,61 @@ stages:
         # Initialize Terraform
         terraform init
 
-        # Remove diagnostic setting if exists
-        terraform state rm azurerm_monitor_diagnostic_setting.aks_metrics || echo "State not found. Skipping removal."
-
         # Import resources into Terraform state
+        echo "Importing resources into Terraform state..."
+        terraform state list | grep azurerm_monitor_diagnostic_setting.aks_metrics || \
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster|aks-metrics-diagnostic-setting"
+
         terraform import azurerm_resource_group.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster"
         terraform import azurerm_storage_account.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123"
         terraform import azurerm_storage_container.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123/blobServices/default/containers/tfstate"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.OperationalInsights/workspaces/goreg-test-analytics-workspace2"
 
-        # Attempt to import diagnostic setting
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster|aks-metrics-diagnostic-setting" || echo "Diagnostic setting not found. Skipping."
-
         # Run Terraform plan
         terraform plan -out=tfplan
 
-        # Apply the plan
+        # Apply Terraform changes
         terraform apply -auto-approve tfplan
-      displayName: 'Terraform Init, Import, Plan, and Apply'
+      displayName: 'Install Terraform, Initialize, Import, and Apply'
       workingDirectory: $(Build.SourcesDirectory)
       env:
-        AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
-        AZURE_TENANT_ID: $(AZURE_TENANT_ID)
-        AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
-        AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+        ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
+        ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+        ARM_TENANT_ID: $(AZURE_TENANT_ID)
+        ARM_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
 
 - stage: DeployMonitoring
+  displayName: 'Deploy Monitoring Tools'
   dependsOn: Terraform
   jobs:
   - job: HelmDeployment
+    displayName: 'Deploy Prometheus and Grafana via Helm'
     steps:
     - script: |
-        # Log in to Azure
+        # Login to Azure using Service Principal
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-
-        # Set subscription
+        
+        # Set Azure Subscription
         az account set --subscription $(AZURE_SUBSCRIPTION_ID)
 
-        # Get AKS credentials
-        az aks get-credentials --resource-group POCMyResourceGroup --name MyAKSCluster
-
-        # Verify connection
-        kubectl cluster-info
+        # Get AKS Credentials
+        az aks get-credentials --resource-group "POCMyResourceGroup" --name "MyAKSCluster"
 
         # Install Helm
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
         # Add Helm repositories
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
 
-        # Deploy Prometheus and Grafana
+        # Install Prometheus and Grafana using Helm
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
-        helm install grafana grafana/grafana --namespace monitoring --set adminPassword=yourpassword --set service.type=LoadBalancer
-      displayName: 'Deploy Monitoring Tools'
+        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer
+
+        # Verify deployments
+        kubectl get pods -n monitoring
+      displayName: 'Install Prometheus and Grafana via Helm'
       env:
-        KUBECONFIG: $(kubeconfig)
+        KUBECONFIG: $(kubeconfig) # Ensure kubeconfig is set properly
