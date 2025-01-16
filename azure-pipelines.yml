@@ -7,11 +7,11 @@ pool:
 variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
-  resource_group_name: 'POCMyResourceGroup3'
-  aks_name: 'MyAKSCluster3'
-  storage_account_name: 'pocmystorageacct12345'
+  resource_group_name: 'POCMyResourceGroup'
+  aks_name: 'MyAKSCluster'
+  storage_account_name: 'pocmystorageacct'
   container_name: 'tfstate'
-  log_analytics_workspace_name: 'goreg-test-analytics-workspace222'
+  log_analytics_workspace_name: 'goreg-test-analytics-workspace'
 
 stages:
 - stage: Terraform
