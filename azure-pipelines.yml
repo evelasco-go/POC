@@ -7,6 +7,11 @@ pool:
 variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
+  resource_group_name: 'POCMyResourceGroup2'
+  aks_name: 'MyAKSCluster2'
+  storage_account_name: 'pocmystorageacct1234'
+  container_name: 'tfstate'
+  log_analytics_workspace_name: 'goreg-test-analytics-workspace22'
 
 stages:
 - stage: Terraform
@@ -93,4 +98,4 @@ stages:
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
       env:
-        KUBECONFIG: $(kubeconfig) # Ensure kubeconfig is set properly
+        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config  # Ensure kubeconfig is set properly
