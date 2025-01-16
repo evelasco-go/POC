@@ -9,9 +9,9 @@ variables:
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
   resource_group_name: 'POCMyResourceGroup3'
   aks_name: 'MyAKSCluster3'
-  storage_account_name: 'pocmystorageacct123'
+  storage_account_name: 'pocmystorageacct12345'
   container_name: 'tfstate'
-  log_analytics_workspace_name: 'goreg-test-analytics-workspace22'
+  log_analytics_workspace_name: 'goreg-test-analytics-workspace222'
 
 stages:
 - stage: Terraform
