@@ -11,7 +11,7 @@ provider "azurerm" {
 variable "aks_name" {
   description = "Name of the AKS cluster"
   type        = string
-  default     = "myakscluster"
+  default     = "myakscluster2"
 }
 
 variable "aks_location" {
@@ -23,7 +23,7 @@ variable "aks_location" {
 variable "resource_group_name" {
   description = "Resource group for the AKS cluster"
   type        = string
-  default     = "myResourceGroup"
+  default     = "myResourceGroup2"
 }
 
 variable "azure_client_id" {
@@ -49,13 +49,13 @@ variable "azure_subscription_id" {
 variable "container_name" {
   description = "Name of the storage container"
   type        = string
-  default     = "mycontainer"
+  default     = "mycontainer2"
 }
 
 variable "storage_account_name" {
   description = "Name of the storage account"
   type        = string
-  default     = "mystorageaccount"
+  default     = "mystorageaccount2"
 }
 
 variable "location" {
@@ -118,7 +118,7 @@ resource "azurerm_storage_container" "example" {
 
 # Declare new Log Analytics workspace
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = "goreg-test-analytics-workspace2"
+  name                = "goreg-test-analytics-workspace22"
   location            = var.location
   resource_group_name = azurerm_resource_group.example.name
   sku                 = "PerGB2018"
@@ -126,7 +126,7 @@ resource "azurerm_log_analytics_workspace" "example" {
 
 # Create the metrics diagnostic setting
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = "aks-metrics-diagnostic-setting"
+  name               = "aks-metrics-diagnostic-setting2"
   target_resource_id = azurerm_kubernetes_cluster.example.id
 
   metric {
