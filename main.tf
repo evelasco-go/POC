@@ -11,19 +11,11 @@ provider "azurerm" {
 variable "aks_name" {
   description = "Name of the AKS cluster"
   type        = string
-  default     = "myakscluster2"
-}
-
-variable "aks_location" {
-  description = "Location for the AKS cluster"
-  type        = string
-  default     = "East US"
 }
 
 variable "resource_group_name" {
   description = "Resource group for the AKS cluster"
   type        = string
-  default     = "myResourceGroup2"
 }
 
 variable "azure_client_id" {
@@ -49,25 +41,21 @@ variable "azure_subscription_id" {
 variable "container_name" {
   description = "Name of the storage container"
   type        = string
-  default     = "mycontainer2"
 }
 
 variable "storage_account_name" {
   description = "Name of the storage account"
   type        = string
-  default     = "mystorageaccount2"
 }
 
 variable "location" {
   description = "Location for the AKS and other resources"
   type        = string
-  default     = "East US"
 }
 
 variable "node_count" {
   description = "Number of nodes in the AKS cluster"
   type        = number
-  default     = 2
 }
 
 # Create the resource group
