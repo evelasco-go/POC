@@ -1,5 +1,5 @@
 trigger:
-- dev
+  - dev
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -13,44 +13,43 @@ stages:
   - job: Terraform
     steps:
     - script: |
-        # Install Terraform using Snap
-        sudo snap install terraform --classic
-        
+        # Install Terraform
+        sudo apt-get update && sudo apt-get install -y unzip curl
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt-get update && sudo apt-get install terraform
+
         # Verify Terraform installation
         terraform version
 
         # Initialize Terraform
         terraform init
 
-        # Wait for 60 seconds to ensure resources are ready
-        echo "Waiting for 60 seconds..."
-        sleep 60
+        # Remove diagnostic setting if exists
+        terraform state rm azurerm_monitor_diagnostic_setting.aks_metrics || echo "State not found. Skipping removal."
 
-        # Remove any existing state for the diagnostic setting (if necessary)
-        terraform state rm azurerm_monitor_diagnostic_setting.aks_metrics || true
+        # Import resources into Terraform state
+        terraform import azurerm_resource_group.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup"
+        terraform import azurerm_kubernetes_cluster.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster"
+        terraform import azurerm_storage_account.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123"
+        terraform import azurerm_storage_container.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123/blobServices/default/containers/tfstate"
+        terraform import azurerm_log_analytics_workspace.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.OperationalInsights/workspaces/goreg-test-analytics-workspace2"
 
-        # Import existing resources into Terraform state
-        terraform import azurerm_resource_group.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup
-        terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster
-        terraform import azurerm_storage_account.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123
-        terraform import azurerm_storage_container.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.Storage/storageAccounts/pocmystorageacct123/blobServices/default/containers/tfstate
-        terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.OperationalInsights/workspaces/goreg-test-analytics-workspace2
-        
-        # Import the AKS metrics diagnostic setting if it doesn't exist already
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster/aks-metrics-diagnostic-setting"
+        # Attempt to import diagnostic setting
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourceGroup/providers/Microsoft.ContainerService/managedClusters/MyAKSCluster|aks-metrics-diagnostic-setting" || echo "Diagnostic setting not found. Skipping."
 
-        # Run Terraform Plan
+        # Run Terraform plan
         terraform plan -out=tfplan
 
-        # Apply the Terraform configuration
-        terraform apply -auto-approve -refresh=false tfplan
-      displayName: 'Install Terraform, Initialize, Wait, Import, and Apply'
-      workingDirectory: $(Build.SourcesDirectory) # Root directory of your repo
+        # Apply the plan
+        terraform apply -auto-approve tfplan
+      displayName: 'Terraform Init, Import, Plan, and Apply'
+      workingDirectory: $(Build.SourcesDirectory)
       env:
-        AZURE_CLIENT_ID: '9a7b7fdd-5a88-46e3-8d9b-b78042012e30'
-        AZURE_TENANT_ID: 'fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282'
-        AZURE_CLIENT_SECRET: 's6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0'
-        AZURE_SUBSCRIPTION_ID: '15e60859-88d7-4c84-943f-55488479910c'
+        AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+        AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+        AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+        AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
 
 - stage: DeployMonitoring
   dependsOn: Terraform
@@ -58,34 +57,29 @@ stages:
   - job: HelmDeployment
     steps:
     - script: |
-        # Azure Login (Ensure you're logged in with the correct subscription)
+        # Log in to Azure
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-        
-        # Use Subscription ID
-        az account set --subscription "15e60859-88d7-4c84-943f-55488479910c"
 
-        # Get AKS credentials for kubectl and Helm
-        az aks get-credentials --resource-group "POCMyResourceGroup" --name "MyAKSCluster"
+        # Set subscription
+        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
 
-        # Ensure kubeconfig content is set
-        mkdir -p ~/.kube
-        echo "$KUBECONFIG" > ~/.kube/config
-        chmod 600 ~/.kube/config
+        # Get AKS credentials
+        az aks get-credentials --resource-group POCMyResourceGroup --name MyAKSCluster
 
-        # Verify cluster connection
+        # Verify connection
         kubectl cluster-info
 
-        # Install Helm using script
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+        # Install Helm
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-        # Add Prometheus and Grafana Helm repositories
+        # Add Helm repositories
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
 
-        # Install Prometheus and Grafana
+        # Deploy Prometheus and Grafana
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
-        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer
-      displayName: 'Install Prometheus and Grafana via Helm'
+        helm install grafana grafana/grafana --namespace monitoring --set adminPassword=yourpassword --set service.type=LoadBalancer
+      displayName: 'Deploy Monitoring Tools'
       env:
-        KUBECONFIG: $(kubeconfig)  # Ensure kubeconfig content is passed
+        KUBECONFIG: $(kubeconfig)
