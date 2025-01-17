@@ -46,6 +46,7 @@ stages:
         terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics /subscriptions/<subscription_id>/resourceGroups/<resource_group_name>/providers/Microsoft.ContainerService/managedClusters/<aks_name>|<diagnostic_setting_name>
 
         # Run Terraform plan with TFvars
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
