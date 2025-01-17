@@ -11,3 +11,5 @@ location                     = "East US"
 log_analytics_workspace_name = "poc-analyticspoc"
 log_analytics_sku            = "PerGB2018"
 diagnostic_setting_name      = "poc-aks-metrics-diagnosticpoc"
+azureSubscription = "15e60859-88d7-4c84-943f-55488479910c"
+
