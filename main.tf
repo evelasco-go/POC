@@ -106,7 +106,7 @@ resource "azurerm_storage_container" "example" {
 
 # Declare new Log Analytics workspace
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = "poc-analytics"
+  name                = "poc-analytics123"
   location            = var.location
   resource_group_name = azurerm_resource_group.example.name
   sku                 = "PerGB2018"
@@ -114,7 +114,7 @@ resource "azurerm_log_analytics_workspace" "example" {
 
 # Create the metrics diagnostic setting
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = "poc-aks-metrics-diagnostic"
+  name               = "poc-aks-metrics-diagnostic123"
   target_resource_id = azurerm_kubernetes_cluster.example.id
 
   metric {
