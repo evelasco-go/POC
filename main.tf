@@ -1,3 +1,4 @@
+# Provider and authentication setup
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -6,13 +7,9 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# Declare variables used in the configuration
 variable "aks_name" {
   description = "Name of the AKS cluster"
-  type        = string
-}
-
-variable "aks_location" {
-  description = "Location for the AKS cluster"
   type        = string
 }
 
@@ -61,11 +58,13 @@ variable "node_count" {
   type        = number
 }
 
+# Create the resource group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
 }
 
+# Create the AKS cluster
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = var.location
@@ -83,28 +82,45 @@ resource "azurerm_kubernetes_cluster" "example" {
   }
 }
 
+# Output the kubeconfig (updated to reflect correct attribute)
 output "kubeconfig" {
   value     = azurerm_kubernetes_cluster.example.kube_config
   sensitive = true
 }
 
+# Create the storage account (for example)
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
   resource_group_name      = azurerm_resource_group.example.name
   location                 = var.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS" # Fixed '=' syntax
+  account_tier              = "Standard"
+  account_replication_type = "LRS"
 }
 
+# Create the storage container (for example)
 resource "azurerm_storage_container" "example" {
   name                  = var.container_name
   storage_account_id    = azurerm_storage_account.example.id
   container_access_type = "private"
 }
 
+# Declare new Log Analytics workspace
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = "goreg-test-analytics-workspace"
+  name                = "goreg-test-analytics-workspace22"
   location            = var.location
   resource_group_name = azurerm_resource_group.example.name
   sku                 = "PerGB2018"
+}
+
+# Create the metrics diagnostic setting
+resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
+  name               = "aks-metrics-diagnostic-setting2"
+  target_resource_id = azurerm_kubernetes_cluster.example.id
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
