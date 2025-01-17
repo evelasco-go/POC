@@ -7,11 +7,6 @@ pool:
 variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
-  resource_group_name: 'POCMyResourceGroup'
-  aks_name: 'MyAKSCluster'
-  storage_account_name: 'pocmystorageacct'
-  container_name: 'tfstate'
-  log_analytics_workspace_name: 'goreg-test-analytics-workspace'
 
 stages:
 - stage: Terraform
@@ -42,15 +37,16 @@ stages:
         terraform init
 
         # Import resources into Terraform state using values from TFvars
-        echo "Importing resources into Terraform state..."
-
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|aks-metrics-diagnostic-setting2"
-        
-        terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
-        terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
-        terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-        terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
-        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+        terraform import azurerm_resource_group.example \
+          "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
+        terraform import azurerm_kubernetes_cluster.example \
+          "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
+        terraform import azurerm_storage_account.example \
+          "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
+        terraform import azurerm_storage_container.example \
+          "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
+        terraform import azurerm_log_analytics_workspace.example \
+          "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
 
         # Run Terraform plan with TFvars
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
