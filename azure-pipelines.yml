@@ -6,12 +6,13 @@ pool:
 
 variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-  terraformVarsFile: 'terraform.tfvars'
+  terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
   resource_group_name: 'POCMyResourcePOC'
   aks_name: 'POCClusterPOC'
   storage_account_name: 'pocmystoragepoc'
   container_name: 'tfstate'
   log_analytics_workspace_name: 'poc-analyticspoc'
+  diagnostic_setting_name: 'aks-metrics-diagnostic-setting'
 
 stages:
 - stage: Terraform
@@ -21,15 +22,32 @@ stages:
     displayName: 'Terraform Deployment'
     steps:
     - script: |
+        # Install required tools
+        curl -LO https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh
+        chmod +x install_linux.sh && ./install_linux.sh
+        curl -sSL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        
+        # Login to Azure using Service Principal
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+      displayName: 'Azure CLI Login'
+
+    - script: |
+        # Initialize Terraform
         terraform init
+
+        # Import existing resources into Terraform state
+        terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|poc-aks-metrics-diagnosticpoc"
-        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
         terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
+        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
+
+        # Run Terraform plan with TFvars
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
+
+        # Apply Terraform changes
         terraform apply -auto-approve tfplan
       displayName: 'Terraform Import, Plan, and Apply'
       env:
@@ -37,6 +55,7 @@ stages:
         ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
         ARM_TENANT_ID: $(AZURE_TENANT_ID)
         ARM_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+      workingDirectory: $(Build.SourcesDirectory)
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
@@ -46,16 +65,27 @@ stages:
     displayName: 'Deploy Prometheus and Grafana via Helm'
     steps:
     - script: |
+        # Login to Azure using Service Principal
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+
+        # Get AKS Credentials
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+
+        # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+        # Add Helm repositories
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
+
+        # Install Prometheus and Grafana using Helm
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
         helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer
+
+        # Verify deployments
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
       env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
+        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config  # Ensure kubeconfig is set properly
