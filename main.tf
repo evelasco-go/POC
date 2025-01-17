@@ -1,3 +1,4 @@
+# Provider configuration for Azure
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -6,6 +7,7 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# Variables for resource group, AKS, and diagnostic settings
 variable "aks_name" {
   description = "Name of the AKS cluster"
   type        = string
@@ -71,12 +73,13 @@ variable "azureSubscription" {
   type        = string
 }
 
-# Resource configurations
+# Resource group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
 }
 
+# Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = var.location
@@ -94,11 +97,13 @@ resource "azurerm_kubernetes_cluster" "example" {
   }
 }
 
+# Output kubeconfig (sensitive)
 output "kubeconfig" {
   value     = azurerm_kubernetes_cluster.example.kube_config
   sensitive = true
 }
 
+# Storage Account Resource
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
   resource_group_name      = azurerm_resource_group.example.name
@@ -107,26 +112,29 @@ resource "azurerm_storage_account" "example" {
   account_replication_type = "LRS"
 }
 
+# Storage Container Resource
 resource "azurerm_storage_container" "example" {
   name                  = var.container_name
   storage_account_id    = azurerm_storage_account.example.id
   container_access_type = "private"
 }
 
+# Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = "poc-analyticspoc"
+  name                = var.log_analytics_workspace_name
   location            = var.location
   resource_group_name = azurerm_resource_group.example.name
   sku                 = "PerGB2018"
 }
 
+# Monitor Diagnostic Setting Resource
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name                       = var.diagnostic_setting_name
   target_resource_id         = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
   log_analytics_workspace_id = "/subscriptions/${var.azure_subscription_id}/resourcegroups/${var.resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${var.log_analytics_workspace_name}"
 
   metric {
-    enabled = true
+    enabled  = true
     category = "AllMetrics"
   }
 }
