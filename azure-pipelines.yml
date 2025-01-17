@@ -21,7 +21,8 @@ stages:
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         
         # Set Azure Subscription
-        az account set --subscription $(azureSubscription)
+        az account set --subscription "$(azureSubscription)"  # Correct reference with quotes
+        
       displayName: 'Azure CLI Login'
 
     - script: |
@@ -48,7 +49,8 @@ stages:
         ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
         ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
         ARM_TENANT_ID: $(AZURE_TENANT_ID)
-        ARM_SUBSCRIPTION_ID: $(azureSubscription)
+        ARM_SUBSCRIPTION_ID: "$(azureSubscription)"
+
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
