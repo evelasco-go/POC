@@ -5,9 +5,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Reference variables from the terraform.tfvars file
-  azureSubscription: '$(azureSubscription)'  # Azure Subscription name
-  terraformVarsFile: 'terraform.tfvars'      # Path to your TFvar file in the repository
+  terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
 
 stages:
 - stage: Terraform
@@ -20,16 +18,13 @@ stages:
         # Login to Azure using Service Principal
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         
-        # Set Azure Subscription
-        az account set --subscription "$(azureSubscription)"  # Correct reference with quotes
+        # Set Azure Subscription from tfvars file
+        az account set --subscription "$(azureSubscription)"  # Reference the subscription ID from TFvars
         
-      displayName: 'Azure CLI Login'
-
-    - script: |
         # Initialize Terraform
         terraform init
 
-        # Import resources into Terraform state using variables from terraform.tfvars
+        # Import resources into Terraform state
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|aks-metrics-diagnostic-setting2"
         
         terraform import azurerm_resource_group.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)"
@@ -49,8 +44,7 @@ stages:
         ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
         ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
         ARM_TENANT_ID: $(AZURE_TENANT_ID)
-        ARM_SUBSCRIPTION_ID: "$(azureSubscription)"
-
+        ARM_SUBSCRIPTION_ID: $(azureSubscription)  # Pass the subscription ID from the TFvars
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
@@ -63,9 +57,9 @@ stages:
         # Login to Azure using Service Principal
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         
-        # Set Azure Subscription
-        az account set --subscription $(azureSubscription)
-
+        # Set Azure Subscription from tfvars file
+        az account set --subscription "$(azureSubscription)"  # Use subscription ID from TFvars
+        
         # Get AKS Credentials
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
@@ -79,11 +73,10 @@ stages:
 
         # Install Prometheus and Grafana using Helm
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
-        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='$(grafana_admin_password)' --set service.type=LoadBalancer
+        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer
 
         # Verify deployments
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
       env:
         KUBECONFIG: $(Build.SourcesDirectory)/.kube/config  # Ensure kubeconfig is set properly
-        grafana_admin_password: $(grafana_admin_password)   # Pulling from variable if defined in pipeline or TFvars
