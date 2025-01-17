@@ -116,13 +116,15 @@ resource "azurerm_log_analytics_workspace" "example" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = "poc-aks-metrics-diagnosticpoc"
-  target_resource_id = azurerm_kubernetes_cluster.example.id
+  name                       = var.diagnostic_setting_name
+  target_resource_id         = "/subscriptions/${var.azureSubscription}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
+  log_analytics_workspace_id = "/subscriptions/${var.azureSubscription}/resourcegroups/${var.resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${var.log_analytics_workspace_name}"
 
-  metric {
+  metrics {
+    enabled = true
     category = "AllMetrics"
-    enabled  = true
   }
+
 
   log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
