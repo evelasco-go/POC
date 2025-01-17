@@ -56,22 +56,6 @@ variable "node_count" {
   type        = number
 }
 
-# New variables for log analytics and diagnostic settings
-variable "log_analytics_workspace_name" {
-  description = "Name of the Log Analytics workspace"
-  type        = string
-}
-
-variable "log_analytics_sku" {
-  description = "SKU for the Log Analytics workspace"
-  type        = string
-}
-
-variable "diagnostic_setting_name" {
-  description = "Name of the Diagnostic Setting for AKS"
-  type        = string
-}
-
 # Resource configurations
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
@@ -115,14 +99,14 @@ resource "azurerm_storage_container" "example" {
 }
 
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = var.log_analytics_workspace_name
+  name                = "poc-analyticspoc"
   location            = var.location
   resource_group_name = azurerm_resource_group.example.name
-  sku                 = var.log_analytics_sku
+  sku                 = "PerGB2018"
 }
 
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = var.diagnostic_setting_name
+  name               = "poc-aks-metrics-diagnosticpoc"
   target_resource_id = azurerm_kubernetes_cluster.example.id
 
   metric {
