@@ -136,4 +136,5 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
     category = "AllMetrics"
     enabled  = true
   }
+log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
