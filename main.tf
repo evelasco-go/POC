@@ -125,7 +125,7 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   target_resource_id         = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
   log_analytics_workspace_id = "/subscriptions/${var.azure_subscription_id}/resourcegroups/${var.resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${var.log_analytics_workspace_name}"
 
-  metrics {
+  metric {
     enabled = true
     category = "AllMetrics"
   }
