@@ -36,20 +36,28 @@ stages:
         # Initialize Terraform
         terraform init
 
-        # Import existing resources into Terraform state
+        # Validate and re-import resources if needed
+        echo "Checking state for azurerm_monitor_diagnostic_setting.aks_metrics..."
+        if ! terraform state show azurerm_monitor_diagnostic_setting.aks_metrics > /dev/null 2>&1; then
+          echo "State misalignment detected. Re-importing resource..."
+          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
+        else
+          echo "State is already aligned. Proceeding..."
+        fi
+
+        # Import remaining resources
         terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
 
         # Run Terraform plan with TFvars
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
 
         # Apply Terraform changes
         terraform apply -auto-approve tfplan
-      displayName: 'Terraform Import, Plan, and Apply'
+      displayName: 'Terraform Import, Validate, Plan, and Apply'
       env:
         ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
         ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
