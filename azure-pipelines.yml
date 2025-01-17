@@ -25,20 +25,46 @@ stages:
       displayName: 'Debug Loaded Variables'
     
     - script: |
+        set -e  # Exit on error
+        echo "Logging in to Azure..."
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         az account set --subscription "$(azureSubscription)"
         
+        echo "Initializing Terraform..."
         terraform init
-        
-        terraform state show azurerm_resource_group.example || terraform import azurerm_resource_group.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)"
+
+        echo "Checking and importing resources as needed..."
+        terraform state show azurerm_resource_group.example || \
+          terraform import azurerm_resource_group.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)"
+
+        terraform state show azurerm_kubernetes_cluster.example || \
+          terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
+
+        terraform state show azurerm_storage_account.example || \
+          terraform import azurerm_storage_account.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
+
+        terraform state show azurerm_storage_container.example || \
+          terraform import azurerm_storage_container.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
+
+        terraform state show azurerm_log_analytics_workspace.example || \
+          terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+
+        terraform state show azurerm_monitor_diagnostic_setting.aks_metrics || \
+          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|aks-metrics-diagnostic-setting2"
+
+        echo "Running Terraform Plan..."
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
+
+        echo "Applying Terraform Plan..."
         terraform apply -auto-approve tfplan
       displayName: 'Terraform Initialize, Import, and Apply'
+      workingDirectory: $(Build.SourcesDirectory)
       env:
         ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
         ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
         ARM_TENANT_ID: $(AZURE_TENANT_ID)
         ARM_SUBSCRIPTION_ID: $(azureSubscription)
+
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
