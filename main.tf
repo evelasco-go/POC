@@ -66,6 +66,11 @@ variable "log_analytics_workspace_name" {
   type        = string
 }
 
+variable "azureSubscription" {
+  description = "Azure Subscription ID"
+  type        = string
+}
+
 # Resource configurations
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
@@ -117,12 +122,11 @@ resource "azurerm_log_analytics_workspace" "example" {
 
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name                       = var.diagnostic_setting_name
-  target_resource_id         = "/subscriptions/${var.azureSubscription}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
-  log_analytics_workspace_id = "/subscriptions/${var.azureSubscription}/resourcegroups/${var.resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${var.log_analytics_workspace_name}"
+  target_resource_id         = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
+  log_analytics_workspace_id = "/subscriptions/${var.azure_subscription_id}/resourcegroups/${var.resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${var.log_analytics_workspace_name}"
 
   metrics {
     enabled = true
     category = "AllMetrics"
   }
-
 }
