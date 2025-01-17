@@ -24,8 +24,14 @@ stages:
 
         # Importing resources into Terraform state
         echo "Importing resources into Terraform state..."
+        resource_group_name=$(grep -i '^resource_group_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")
+        aks_name=$(grep -i '^aks_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")
+        diagnostic_setting_name=$(grep -i '^diagnostic_setting_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")
+        azure_subscription=$(grep -i '^azureSubscription' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")
+
+        # Corrected import statement
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics \
-          "/subscriptions/$(grep -i '^azureSubscription' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")/resourceGroups/$(grep -i '^resource_group_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")/providers/Microsoft.ContainerService/managedClusters/$(grep -i '^aks_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")|$(grep -i '^diagnostic_setting_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
+          "/subscriptions/${azure_subscription}/resourceGroups/${resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${aks_name}|${diagnostic_setting_name}"
 
         # Running Terraform plan
         echo "Running Terraform plan..."
@@ -41,6 +47,7 @@ stages:
         ARM_CLIENT_SECRET: $(grep -i '^azure_client_secret' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
         ARM_TENANT_ID: $(grep -i '^azure_tenant_id' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
         ARM_SUBSCRIPTION_ID: $(grep -i '^azure_subscription_id' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")'
+
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
