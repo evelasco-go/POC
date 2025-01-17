@@ -29,21 +29,16 @@ stages:
       displayName: 'Azure CLI Login'
 
     - script: |
-        # Install Terraform
-        sudo apt-get update && sudo apt-get install -y unzip curl
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-        sudo apt-get update && sudo apt-get install terraform -y
-
-        # Verify Terraform installation
-        terraform version
+        # Login to Azure using Service Principal
+        az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+        
+        # Set Azure Subscription
+        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
 
         # Initialize Terraform
         terraform init
 
-        # Import resources into Terraform state using values from TFvars
-        echo "Importing resources into Terraform state..."
-
+        # Import resources into Terraform state
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|aks-metrics-diagnostic-setting2"
         
         terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
