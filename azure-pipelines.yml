@@ -6,10 +6,7 @@ pool:
 
 variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-  terraformVarsFile: 'terraform.tfvars' # Path to your TFvar file in the repository
-  resource_group_name: 'your-resource-group'
-  aks_name: 'your-aks-cluster-name'
-  storage_account_name: 'your-storage-account'
+  terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
 
 stages:
 - stage: Terraform
@@ -39,18 +36,28 @@ stages:
         # Initialize Terraform
         terraform init
 
-        # Export required variables
-        export resource_group_name=$(resource_group_name)
-        export aks_name=$(aks_name)
-        export storage_account_name=$(storage_account_name)
-
-        # Import resources into Terraform state
+        # Import existing resources into Terraform state
+        echo "Importing resources into Terraform state..."
         terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
+        terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
+        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
 
-        # Run Terraform plan with TFvars
-        terraform plan -var-file=$(terraformVarsFile) -out=tfplan
+        # Run Terraform plan with variables passed in the pipeline
+        terraform plan \
+          -var="aks_name=$(aks_name)" \
+          -var="aks_location=eastus" \
+          -var="resource_group_name=$(resource_group_name)" \
+          -var="azure_client_id=$(AZURE_CLIENT_ID)" \
+          -var="azure_client_secret=$(AZURE_CLIENT_SECRET)" \
+          -var="azure_tenant_id=$(AZURE_TENANT_ID)" \
+          -var="azure_subscription_id=$(AZURE_SUBSCRIPTION_ID)" \
+          -var="container_name=my-container" \
+          -var="storage_account_name=mystorageaccount" \
+          -var="location=eastus" \
+          -var="node_count=3" \
+          -out=tfplan
 
         # Apply Terraform changes
         terraform apply -auto-approve tfplan
@@ -95,4 +102,4 @@ stages:
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
       env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
+        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config  # Ensure kubeconfig is set properly
