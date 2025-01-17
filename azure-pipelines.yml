@@ -4,9 +4,6 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  terraformVarsFile: 'terraform.tfvars'  # Path to your TFvars file in the repository
-
 stages:
 - stage: Terraform
   displayName: 'Terraform Stage'
@@ -17,42 +14,34 @@ stages:
     - script: |
         set -e
 
-        echo "Reading Azure Subscription from terraform.tfvars..."
-        export azureSubscription=$(grep 'azureSubscription' $(terraformVarsFile) | cut -d '=' -f2 | tr -d ' "')
-        if [ -z "$azureSubscription" ]; then
-          echo "Error: azureSubscription not found in terraform.tfvars!"
-          exit 1
-        fi
-
-        echo "Logging in to Azure..."
-        az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-
-        echo "Setting Azure Subscription..."
-        az account set --subscription "$azureSubscription"
-
+        # Initializing Terraform and configuring the backend
         echo "Initializing Terraform..."
-        terraform init
+        terraform init -backend-config="storage_account_name=$(grep -i '^storage_account_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")" \
+                       -backend-config="container_name=$(grep -i '^container_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")" \
+                       -backend-config="key=terraform.tfstate" \
+                       -backend-config="resource_group_name=$(grep -i '^resource_group_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")" \
+                       -backend-config="subscription_id=$(grep -i '^azureSubscription' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
 
+        # Importing resources into Terraform state
         echo "Importing resources into Terraform state..."
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$azureSubscription/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|aks-metrics-diagnostic-setting2"
-        terraform import azurerm_resource_group.example "/subscriptions/$azureSubscription/resourceGroups/$(resource_group_name)"
-        terraform import azurerm_kubernetes_cluster.example "/subscriptions/$azureSubscription/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
-        terraform import azurerm_storage_account.example "/subscriptions/$azureSubscription/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-        terraform import azurerm_storage_container.example "/subscriptions/$azureSubscription/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
-        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$azureSubscription/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics \
+          "/subscriptions/$(grep -i '^azureSubscription' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")/resourceGroups/$(grep -i '^resource_group_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")/providers/Microsoft.ContainerService/managedClusters/$(grep -i '^aks_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")|$(grep -i '^diagnostic_setting_name' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
 
+        # Running Terraform plan
         echo "Running Terraform plan..."
-        terraform plan -var-file=$(terraformVarsFile) -out=tfplan
+        terraform plan -var-file=terraform.tfvars -out=tfplan
 
+        # Applying the Terraform plan
         echo "Applying Terraform changes..."
         terraform apply -auto-approve tfplan
       displayName: 'Terraform Initialize, Import, and Apply'
       workingDirectory: $(Build.SourcesDirectory)
       env:
-        ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
-        ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
-        ARM_TENANT_ID: $(AZURE_TENANT_ID)
-        ARM_SUBSCRIPTION_ID: $azureSubscription
+        ARM_CLIENT_ID: $(grep -i '^azure_client_id' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
+        ARM_CLIENT_SECRET: $(grep -i '^azure_client_secret' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
+        ARM_TENANT_ID: $(grep -i '^azure_tenant_id' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")"
+        ARM_SUBSCRIPTION_ID: $(grep -i '^azure_subscription_id' terraform.tfvars | cut -d '=' -f2 | tr -d ' \")'
+
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
