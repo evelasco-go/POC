@@ -56,6 +56,16 @@ variable "node_count" {
   type        = number
 }
 
+variable "diagnostic_setting_name" {
+  description = "The name of the diagnostic setting"
+  type        = string
+}
+
+variable "log_analytics_workspace_name" {
+  description = "The name of the Log Analytics workspace"
+  type        = string
+}
+
 # Resource configurations
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
