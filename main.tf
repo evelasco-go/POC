@@ -73,11 +73,6 @@ variable "log_analytics_sku" {
   type        = string
 }
 
-variable "aks_cluster_name" {
-  description = "The name of the AKS cluster."
-  type        = string
-}
-
 # Resource group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
