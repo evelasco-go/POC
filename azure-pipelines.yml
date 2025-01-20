@@ -13,6 +13,7 @@ variables:
   log_analytics_workspace_name: 'poc-analyticspoc'
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
   terraformVersion: '1.3.5'  # Specify the version of Terraform to use
+  diagnostic_setting_name: 'aks-metrics'  # Define your diagnostic setting name
 
 stages:
 - stage: Terraform
