@@ -118,19 +118,17 @@ output "kubeconfig" {
   sensitive = true
 }
 
-# Storage Account Resource
+resource "random_id" "unique_suffix" {
+  byte_length = 8
+}
+
 resource "azurerm_storage_account" "example" {
-  name                     = "pocstorage${random_id.unique_suffix.hex}"  # Generate a unique name
+  name                     = lower("pocstorage${random_id.unique_suffix.hex}")  # Convert to lowercase
   resource_group_name       = var.resource_group_name
   location                 = var.location
   account_tier              = "Standard"
   account_replication_type = "LRS"
 }
-
-resource "random_id" "unique_suffix" {
-  byte_length = 8
-}
-
 
 # Storage Container Resource
 resource "azurerm_storage_container" "example" {
