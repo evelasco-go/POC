@@ -93,10 +93,13 @@ stages:
         fi
 
         # Import or Create Diagnostic Setting
-        if [[ "$(check_resource_exists $DIAGNOSTIC_SETTING_ID)" == "true" ]]; then
-          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "$DIAGNOSTIC_SETTING_ID"
-        else
+        EXISTING_DIAGNOSTIC_SETTING=$(az monitor diagnostic-settings list --resource $(AKS_CLUSTER_ID) --query "[?name=='$(diagnostic_setting_name)'].name" -o tsv)
+
+        if [[ -z "$EXISTING_DIAGNOSTIC_SETTING" ]]; then
+          # If the diagnostic setting does not exist, create it
           terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
+        else
+          echo "Diagnostic setting '$(diagnostic_setting_name)' already exists, skipping creation."
         fi
       displayName: 'Import or Create Resources Dynamically'
 
