@@ -47,7 +47,7 @@ stages:
         echo "Checking state for azurerm_monitor_diagnostic_setting.aks_metrics..."
         if ! terraform state show azurerm_monitor_diagnostic_setting.aks_metrics > /dev/null 2>&1; then
           echo "State misalignment detected. Re-importing resource..."
-          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
+          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/$(diagnostic_setting_name)"
         else
           echo "State is already aligned. Proceeding..."
         fi
