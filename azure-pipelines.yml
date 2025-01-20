@@ -35,58 +35,43 @@ stages:
         LOG_ANALYTICS_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
         DIAGNOSTIC_SETTING_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
 
-        # Import or Create Resource Group
+        # Import Resource Group if it exists
         if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
           terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_resource_group.example
         fi
 
-        # Import or Create AKS Cluster
-        if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" ]]; then
-          terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_kubernetes_cluster.example
-        fi
-
-        # Import or Create Storage Account
+        # Import Storage Account if it exists
         if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" ]]; then
           terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_storage_account.example
         fi
 
-        # Import or Delete and Recreate Storage Container
+        # Import Storage Container if it exists
         if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" ]]; then
-          echo "Storage container exists, deleting it..."
-          az storage container delete --name $(container_name) --account-name $(storage_account_name) --yes
+          terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
         fi
-        terraform apply -auto-approve -target=azurerm_storage_container.example
 
-        # Import or Create Log Analytics Workspace
+        # Import AKS Cluster if it exists
+        if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" ]]; then
+          terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
+        fi
+
+        # Import Log Analytics Workspace if it exists
         if [[ "$(check_resource_exists $LOG_ANALYTICS_ID)" == "true" ]]; then
           terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_log_analytics_workspace.example
         fi
 
-        # Import or Delete and Recreate Diagnostic Setting
+        # Import Diagnostic Setting if it exists
         EXISTING_DIAGNOSTIC_SETTING=$(az monitor diagnostic-settings list --resource $(AKS_CLUSTER_ID) --query "[?name=='$(diagnostic_setting_name)'].name" -o tsv)
 
-        if [[ -z "$EXISTING_DIAGNOSTIC_SETTING" ]]; then
-          echo "Diagnostic setting does not exist, creating it."
-          terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
-        else
-          echo "Diagnostic setting '$(diagnostic_setting_name)' already exists, deleting and recreating."
-          az monitor diagnostic-settings delete --ids $DIAGNOSTIC_SETTING_ID --yes
-          terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
+        if [[ -n "$EXISTING_DIAGNOSTIC_SETTING" ]]; then
+          terraform import azurerm_monitor_diagnostic_setting.example "$DIAGNOSTIC_SETTING_ID"
         fi
-      displayName: 'Import or Create Resources Dynamically'
+      displayName: 'Import Existing Resources'
 
     - script: |
         terraform plan -out=tfplan
       displayName: 'Terraform Plan'
-    
+
     - script: |
         terraform apply -auto-approve
       displayName: 'Terraform Apply'
