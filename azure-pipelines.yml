@@ -60,37 +60,37 @@ stages:
         if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
           terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
         else
-          terraform apply -target=azurerm_resource_group.example
+          terraform apply -auto-approve
         fi
 
         if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" ]]; then
           terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
         else
-          terraform apply -target=azurerm_kubernetes_cluster.example
+          terraform apply -auto-approve
         fi
 
         if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" ]]; then
           terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
         else
-          terraform apply -target=azurerm_storage_account.example
+          terraform apply -auto-approve
         fi
 
         if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" ]]; then
           terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
         else
-          terraform apply -target=azurerm_storage_container.example
+          terraform apply -auto-approve
         fi
 
         if [[ "$(check_resource_exists $LOG_ANALYTICS_ID)" == "true" ]]; then
           terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID"
         else
-          terraform apply -target=azurerm_log_analytics_workspace.example
+          terraform apply -auto-approve
         fi
 
         if [[ "$(check_resource_exists $DIAGNOSTIC_SETTING_ID)" == "true" ]]; then
           terraform import azurerm_monitor_diagnostic_setting.aks_metrics "$DIAGNOSTIC_SETTING_ID"
         else
-          terraform apply -target=azurerm_monitor_diagnostic_setting.aks_metrics
+          terraform apply -auto-approve
         fi
       displayName: 'Import or Create Resources Dynamically'
 
@@ -99,7 +99,7 @@ stages:
       displayName: 'Terraform Plan'
     
     - script: |
-        terraform apply -auto-approve tfplan
+        terraform apply -auto-approve
       displayName: 'Terraform Apply'
       env:
         ARM_CLIENT_ID: $(azure_client_id)
