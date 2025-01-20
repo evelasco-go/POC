@@ -41,7 +41,8 @@ stages:
         terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
 
         # Import existing Monitor Diagnostic Setting if it exists
-         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCMyResourcePOC/providers/Microsoft.ContainerService/managedClusters/POCClusterPOC/diagnosticSettings/poc-aks-metrics-diagnosticpoc|poc-aks-metrics-diagnosticpoc"
+        # terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/poc-aks-metrics-diagnosticpoc"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${aks_name}/diagnosticSettings/${diagnostic_setting_name}|${diagnostic_setting_name}"
 
         
         # Plan Terraform changes
