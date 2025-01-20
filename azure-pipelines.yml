@@ -35,32 +35,32 @@ stages:
         LOG_ANALYTICS_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
         DIAGNOSTIC_SETTING_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
 
-        # Import Resource Group if it exists
+        # Check if Resource Group exists and Import
         if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
           terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
         fi
 
-        # Import Storage Account if it exists
+        # Check if Storage Account exists and Import
         if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" ]]; then
           terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
         fi
 
-        # Import Storage Container if it exists
+        # Check if Storage Container exists and Import
         if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" ]]; then
           terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
         fi
 
-        # Import AKS Cluster if it exists
+        # Check if AKS Cluster exists and Import
         if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" ]]; then
           terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
         fi
 
-        # Import Log Analytics Workspace if it exists
+        # Check if Log Analytics Workspace exists and Import
         if [[ "$(check_resource_exists $LOG_ANALYTICS_ID)" == "true" ]]; then
           terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID"
         fi
 
-        # Import Diagnostic Setting if it exists
+        # Check if Diagnostic Setting exists and Import
         EXISTING_DIAGNOSTIC_SETTING=$(az monitor diagnostic-settings list --resource $(AKS_CLUSTER_ID) --query "[?name=='$(diagnostic_setting_name)'].name" -o tsv)
 
         if [[ -n "$EXISTING_DIAGNOSTIC_SETTING" ]]; then
