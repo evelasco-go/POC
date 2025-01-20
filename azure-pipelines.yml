@@ -19,6 +19,7 @@ variables:
   log_analytics_sku: "PerGB2018"
   diagnostic_setting_name: "pocdiagnosticpocpcpcpc"
   terraformVersion: '1.3.5'  # Specify the version of Terraform to use
+  
 
 stages:
 - stage: Terraform
@@ -44,13 +45,20 @@ stages:
     
     - script: |
         # Import resources if they don't exist in Terraform state yet
-        terraform import azurerm_resource_group.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
-         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
-        terraform import azurerm_storage_account.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-        terraform import azurerm_storage_container.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
-        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/${azure_subscription_id}/resourceGroups/${resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${aks_name}/diagnosticSettings/${diagnostic_setting_name}|${diagnostic_setting_name}"
-       
+        # Import Resource Group
+        terraform import azurerm_resource_group.example "/subscriptions/${azure_subscription_id}/resourceGroups/${resource_group_name}"
+        # Import AKS Cluster
+        terraform import azurerm_kubernetes_cluster.example "/subscriptions/${azure_subscription_id}/resourceGroups/${resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${aks_name}"
+        # Import Storage Account
+        terraform import azurerm_storage_account.example "/subscriptions/${azure_subscription_id}/resourceGroups/${resource_group_name}/providers/Microsoft.Storage/storageAccounts/${storage_account_name}"
+        # Import Storage Container
+        terraform import azurerm_storage_container.example "${storage_account_name}/default/${container_name}"
+        # Import Log Analytics Workspace
+        terraform import azurerm_log_analytics_workspace.example "/subscriptions/${azure_subscription_id}/resourceGroups/${resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${log_analytics_workspace_name}"
+
+        # Import Diagnostic Setting
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/${azure_subscription_id}/resourceGroups/${resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${aks_name}/diagnosticSettings/${diagnostic_setting_name}"
+
       displayName: 'Import Existing Resources into Terraform State'
 
     - script: |
