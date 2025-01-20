@@ -6,14 +6,14 @@ pool:
 
 variables:
   azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Update if needed
-  resource_group_name: 'POCMyResourcePOC'
-  aks_name: 'POCClusterPOC'
-  storage_account_name: 'pocmystoragepoc'
+  resource_group_name: 'POCresource'
+  aks_name: 'POCAKSCluster'
+  storage_account_name: 'pocstorage'
   container_name: 'tfstate'
-  log_analytics_workspace_name: 'poc-analyticspoc'
+  log_analytics_workspace_name: 'pocanalytics'
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
   terraformVersion: '1.3.5'  # Specify the version of Terraform to use
-  diagnostic_setting_name: 'aks-metrics'  # Define your diagnostic setting name
+  diagnostic_setting_name: 'pocdiagnosticpoc'  # Define your diagnostic setting name
 
 stages:
 - stage: Terraform
