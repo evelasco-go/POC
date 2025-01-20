@@ -123,7 +123,7 @@ resource "random_id" "unique_suffix" {
 }
 
 resource "azurerm_storage_account" "example" {
-  name                     = lower("pocstorage${random_id.unique_suffix.hex}")  # Convert to lowercase
+  name                     = var.storage_account_name
   resource_group_name       = var.resource_group_name
   location                 = var.location
   account_tier              = "Standard"
