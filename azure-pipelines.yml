@@ -39,7 +39,7 @@ stages:
     - script: |
         terraform init
       displayName: 'Terraform Init'
-    
+
     - script: |
         check_resource_exists() {
           local resource_id="$1"
