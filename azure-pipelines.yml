@@ -38,12 +38,15 @@ stages:
         terraform init
 
         # Import resources if they don't exist in Terraform state yet
-        terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
+        #terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
+        terraform import azurerm_resource_group.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/POCresourcepcpcpc"
+
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/$(diagnostic_setting_name)"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+
 
         # Plan Terraform changes
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
