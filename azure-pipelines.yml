@@ -100,6 +100,7 @@ stages:
           # If the diagnostic setting does not exist, create it
           terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
         else
+          terraform import azurerm_monitor_diagnostic_setting.example "$DIAGNOSTIC_SETTING_ID"
           echo "Diagnostic setting '$(diagnostic_setting_name)' already exists, skipping creation."
         fi
       displayName: 'Import or Create Resources Dynamically'
@@ -116,6 +117,7 @@ stages:
         ARM_CLIENT_SECRET: $(azure_client_secret)
         ARM_TENANT_ID: $(azure_tenant_id)
         ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
+
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
