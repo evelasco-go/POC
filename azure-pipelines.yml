@@ -26,7 +26,14 @@ stages:
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         az account set --subscription $(AZURE_SUBSCRIPTION_ID)
       displayName: 'Azure CLI Login'
-
+    
+    - script: |
+        # Ensure the resource group is imported into Terraform state if it already exists
+        terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
+        terraform init
+        terraform plan -var-file=$(terraformVarsFile) -out=tfplan
+      displayName: 'Terraform Import and Plan'
+      
     - script: |
         # Initialize Terraform
         terraform init
@@ -41,7 +48,6 @@ stages:
         fi
 
         # Import remaining resources
-        terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         terraform import azurerm_storage_account.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
