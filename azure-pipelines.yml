@@ -58,27 +58,27 @@ stages:
         DIAGNOSTIC_SETTING_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
 
         # Import Resource Group
-        if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
+        if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" && "$(terraform state list | grep azurerm_resource_group.example)" == "" ]]; then
           terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
         fi
 
         # Import AKS Cluster
-        if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" ]]; then
+        if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" && "$(terraform state list | grep azurerm_kubernetes_cluster.example)" == "" ]]; then
           terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
         fi
 
         # Import Storage Account
-        if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" ]]; then
+        if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" && "$(terraform state list | grep azurerm_storage_account.example)" == "" ]]; then
           terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
         fi
 
         # Import Storage Container
-        if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" ]]; then
+        if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" && "$(terraform state list | grep azurerm_storage_container.example)" == "" ]]; then
           terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
         fi
 
         # Import Log Analytics Workspace
-        if [[ "$(check_resource_exists $LOG_ANALYTICS_ID)" == "true" ]]; then
+        if [[ "$(check_resource_exists $LOG_ANALYTICS_ID)" == "true" && "$(terraform state list | grep azurerm_log_analytics_workspace.example)" == "" ]]; then
           terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID"
         fi
 
@@ -97,6 +97,7 @@ stages:
       displayName: 'Import Existing Resources'
 
     - script: |
+        terraform refresh
         terraform plan -out=tfplan
       displayName: 'Terraform Plan'
 
