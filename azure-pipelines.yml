@@ -27,11 +27,6 @@ stages:
       displayName: 'Azure CLI Login'
     
     - script: |
-        # Ensure that the terraform.tfvars file exists and display it
-        cat $(terraformVarsFile)
-      displayName: 'Verify terraform.tfvars file exists'
-    
-    - script: |
         # Dynamically extract variables from terraform.tfvars
         export TFVARS=$(cat $(terraformVarsFile) | grep -v '^#' | sed 's/ *= */=/g')
         for var in $TFVARS; do
@@ -39,6 +34,27 @@ stages:
         done
         
         # Output extracted values to verify
+        echo "Subscription ID: $TF_azure_subscription_id"
+        echo "Resource Group Name: $TF_resource_group_name"
+        echo "AKS Name: $TF_aks_name"
+        echo "Diagnostic Setting Name: $TF_diagnostic_setting_name"
+        echo "Storage Account Name: $TF_storage_account_name"
+        echo "Container Name: $TF_container_name"
+        echo "Log Analytics Workspace Name: $TF_log_analytics_workspace_name"
+      displayName: 'Extract and Export Variables from terraform.tfvars'
+    
+    - script: |
+        # Import resources if they don't exist in Terraform state yet
+        terraform import azurerm_resource_group.example "/subscriptions/$TF_azure_subscription_id/resourceGroups/$TF_resource_group_name"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$TF_azure_subscription_id/resourceGroups/$TF_resource_group_name/providers/Microsoft.ContainerService/managedClusters/$TF_aks_name/diagnosticSettings/$TF_diagnostic_setting_name"
+        terraform import azurerm_kubernetes_cluster.example "/subscriptions/$TF_azure_subscription_id/resourceGroups/$TF_resource_group_name/providers/Microsoft.ContainerService/managedClusters/$TF_aks_name"
+        terraform import azurerm_storage_account.example "/subscriptions/$TF_azure_subscription_id/resourceGroups/$TF_resource_group_name/providers/Microsoft.Storage/storageAccounts/$TF_storage_account_name"
+        terraform import azurerm_storage_container.example "/subscriptions/$TF_azure_subscription_id/resourceGroups/$TF_resource_group_name/providers/Microsoft.Storage/storageAccounts/$TF_storage_account_name/blobServices/default/containers/$TF_container_name"
+        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$TF_azure_subscription_id/resourceGroups/$TF_resource_group_name/providers/Microsoft.OperationalInsights/workspaces/$TF_log_analytics_workspace_name"
+      displayName: 'Import Existing Resources into Terraform State'
+
+    - script: |
+        # Output to verify variable values from terraform.tfvars
         echo "Subscription ID: $TF_azure_subscription_id"
         echo "Resource Group Name: $TF_resource_group_name"
         echo "AKS Name: $TF_aks_name"
@@ -76,12 +92,6 @@ stages:
         # Login to Azure using Service Principal
         az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
         az account set --subscription $(AZURE_SUBSCRIPTION_ID)
-
-        # Dynamically extract AKS variables from terraform.tfvars
-        export TFVARS=$(cat $(terraformVarsFile) | grep -v '^#' | sed 's/ *= */=/g')
-        for var in $TFVARS; do
-          export $(echo $var | sed 's/^/TF_/')
-        done
 
         # Get AKS Credentials
         az aks get-credentials --resource-group $TF_resource_group_name --name $TF_aks_name
