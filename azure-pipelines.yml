@@ -5,15 +5,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  #azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Update if needed
-  # resource_group_name: 'POCresourcepcpcpc'
-  # aks_name: 'POCAKSClustepcpcpc'
-  # storage_account_name: 'pocstoragepcpc'
-  #container_name: 'tfstate'
-  #log_analytics_workspace_name: 'pocanalyticspcpcpc'
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
   terraformVersion: '1.3.5'  # Specify the version of Terraform to use
-  #diagnostic_setting_name: 'pocdiagnosticpocpcpcpc'  # Define your diagnostic setting name
 
 stages:
 - stage: Terraform
@@ -34,6 +27,7 @@ stages:
       displayName: 'Azure CLI Login'
     
     - script: |
+        # Echo variables to verify they are passed correctly
         echo "Subscription ID: $(AZURE_SUBSCRIPTION_ID)"
         echo "Resource Group Name: $(resource_group_name)"
         echo "AKS Name: $(aks_name)"
@@ -41,6 +35,7 @@ stages:
         echo "Storage Account Name: $(storage_account_name)"
         echo "Container Name: $(container_name)"
         echo "Log Analytics Workspace Name: $(log_analytics_workspace_name)"
+        
         # Initialize Terraform and download dependencies
         terraform init
 
@@ -52,8 +47,7 @@ stages:
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
 
-
-        # Plan Terraform changes
+        # Plan Terraform changes using the tfvars file
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
       displayName: 'Terraform Init, Import Resources, and Plan'
     
