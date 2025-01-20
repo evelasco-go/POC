@@ -139,5 +139,6 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
     retention_policy {
       enabled = false
     }
+}
 log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
