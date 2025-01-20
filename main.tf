@@ -142,7 +142,7 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name               = "aks-metrics-setting"
   target_resource_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_cluster_name}"
 
-  metrics {
+  metric {
     category = "AllMetrics"
     enabled  = true
     retention_policy {
