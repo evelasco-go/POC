@@ -5,7 +5,19 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
+  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
+  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
+  resource_group_name: "POCresourcepcpcpc"
+  storage_account_name: "pocstoragepcpc"
+  container_name: "tfstate"
+  aks_name: "POCAKSClusterpcpcpc"
+  node_count: 2
+  location: "East US"
+  log_analytics_workspace_name: "pocanalyticspcpcpc"
+  log_analytics_sku: "PerGB2018"
+  diagnostic_setting_name: "pocdiagnosticpocpcpcpc"
   terraformVersion: '1.3.5'  # Specify the version of Terraform to use
 
 stages:
@@ -22,66 +34,47 @@ stages:
         curl -sSL https://aka.ms/InstallAzureCLIDeb | sudo bash
         
         # Login to Azure using Service Principal
-        az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+        az account set --subscription $(azure_subscription_id)
       displayName: 'Azure CLI Login'
     
     - script: |
         terraform init
-
-        # Dynamically extract variables from terraform.tfvars
-        export TFVARS=$(cat $(terraformVarsFile) | grep -v '^#' | sed 's/ *= */=/g')
-        for var in $TFVARS; do
-          export $(echo $var | sed 's/^/TF_/')
-        done
-        
-        # Output extracted values to verify
-        echo "Subscription ID: $TF_azure_subscription_id"
-        echo "Resource Group Name: $TF_resource_group_name"
-        echo "AKS Name: $TF_aks_name"
-        echo "Diagnostic Setting Name: $TF_diagnostic_setting_name"
-        echo "Storage Account Name: $TF_storage_account_name"
-        echo "Container Name: $TF_container_name"
-        echo "Log Analytics Workspace Name: $TF_log_analytics_workspace_name"
-      displayName: 'Extract and Export Variables from terraform.tfvars'
+      displayName: 'Terraform Init'
     
     - script: |
         # Import resources if they don't exist in Terraform state yet
-        terraform import azurerm_resource_group.example "/subscriptions/${TF_azure_subscription_id}/resourceGroups/${TF_resource_group_name}"
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/${TF_azure_subscription_id}/resourceGroups/${TF_resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${TF_aks_name}/diagnosticSettings/${TF_diagnostic_setting_name}"
-        terraform import azurerm_kubernetes_cluster.example "/subscriptions/${TF_azure_subscription_id}/resourceGroups/${TF_resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${TF_aks_name}"
-        terraform import azurerm_storage_account.example "/subscriptions/${TF_azure_subscription_id}/resourceGroups/${TF_resource_group_name}/providers/Microsoft.Storage/storageAccounts/${TF_storage_account_name}"
-        terraform import azurerm_storage_container.example "/subscriptions/${TF_azure_subscription_id}/resourceGroups/${TF_resource_group_name}/providers/Microsoft.Storage/storageAccounts/${TF_storage_account_name}/blobServices/default/containers/${TF_container_name}"
-        terraform import azurerm_log_analytics_workspace.example "/subscriptions/${TF_azure_subscription_id}/resourceGroups/${TF_resource_group_name}/providers/Microsoft.OperationalInsights/workspaces/${TF_log_analytics_workspace_name}"
-
+        terraform import azurerm_resource_group.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/$(diagnostic_setting_name)"
+        terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
+        terraform import azurerm_storage_account.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
+        terraform import azurerm_storage_container.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
+        terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
       displayName: 'Import Existing Resources into Terraform State'
 
     - script: |
-        # Output to verify variable values from terraform.tfvars
-        echo "Subscription ID: $TF_azure_subscription_id"
-        echo "Resource Group Name: $TF_resource_group_name"
-        echo "AKS Name: $TF_aks_name"
-        echo "Diagnostic Setting Name: $TF_diagnostic_setting_name"
-        echo "Storage Account Name: $TF_storage_account_name"
-        echo "Container Name: $TF_container_name"
-        echo "Log Analytics Workspace Name: $TF_log_analytics_workspace_name"
+        # Output to verify variable values
+        echo "Subscription ID: $(azure_subscription_id)"
+        echo "Resource Group Name: $(resource_group_name)"
+        echo "AKS Name: $(aks_name)"
+        echo "Diagnostic Setting Name: $(diagnostic_setting_name)"
+        echo "Storage Account Name: $(storage_account_name)"
+        echo "Container Name: $(container_name)"
+        echo "Log Analytics Workspace Name: $(log_analytics_workspace_name)"
         
-        # Initialize Terraform and download dependencies
-        # terraform init
-
-        # Plan Terraform changes, referencing the terraform.tfvars file
-        terraform plan -var-file=$(terraformVarsFile) -out=tfplan
-      displayName: 'Terraform Init, Import Resources, and Plan'
+        # Plan Terraform changes
+        terraform plan -out=tfplan
+      displayName: 'Terraform Plan'
     
     - script: |
         # Apply Terraform changes
         terraform apply -auto-approve tfplan
       displayName: 'Terraform Apply'
       env:
-        ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
-        ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
-        ARM_TENANT_ID: $(AZURE_TENANT_ID)
-        ARM_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+        ARM_CLIENT_ID: $(azure_client_id)
+        ARM_CLIENT_SECRET: $(azure_client_secret)
+        ARM_TENANT_ID: $(azure_tenant_id)
+        ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
       workingDirectory: $(Build.SourcesDirectory)
 
 - stage: DeployMonitoring
@@ -93,11 +86,11 @@ stages:
     steps:
     - script: |
         # Login to Azure using Service Principal
-        az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-        az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+        az account set --subscription $(azure_subscription_id)
 
         # Get AKS Credentials
-        az aks get-credentials --resource-group $TF_resource_group_name --name $TF_aks_name
+        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
         # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
