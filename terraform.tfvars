@@ -11,7 +11,4 @@ location                     = "East US"
 log_analytics_workspace_name = "pocanalyticspcpcpc"
 log_analytics_sku            = "PerGB2018"
 diagnostic_setting_name      = "pocdiagnosticpocpcpcpc"
-azureSubscription = "15e60859-88d7-4c84-943f-55488479910c"
-subscription_id      = "15e60859-88d7-4c84-943f-55488479910c"
-aks_cluster_name     = "POCAKSClusterpcpcpc"
 
