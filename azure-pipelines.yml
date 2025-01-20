@@ -27,7 +27,12 @@ stages:
       displayName: 'Azure CLI Login'
     
     - script: |
-        # Echo variables to verify they are passed correctly
+        # Display the contents of the terraform.tfvars file to verify its presence and values
+        cat $(terraformVarsFile)
+      displayName: 'Verify terraform.tfvars file'
+
+    - script: |
+        # Output to verify variable values
         echo "Subscription ID: $(AZURE_SUBSCRIPTION_ID)"
         echo "Resource Group Name: $(resource_group_name)"
         echo "AKS Name: $(aks_name)"
@@ -35,7 +40,7 @@ stages:
         echo "Storage Account Name: $(storage_account_name)"
         echo "Container Name: $(container_name)"
         echo "Log Analytics Workspace Name: $(log_analytics_workspace_name)"
-        
+
         # Initialize Terraform and download dependencies
         terraform init
 
@@ -47,7 +52,7 @@ stages:
         terraform import azurerm_storage_container.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
 
-        # Plan Terraform changes using the tfvars file
+        # Plan Terraform changes
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
       displayName: 'Terraform Init, Import Resources, and Plan'
     
