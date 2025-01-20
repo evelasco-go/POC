@@ -129,12 +129,15 @@ resource "azurerm_log_analytics_workspace" "example" {
 
 # Monitor Diagnostic Setting Resource
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = var.diagnostic_setting_name
-  target_resource_id = azurerm_kubernetes_cluster.example.id
+  name               = "aks-metrics-setting"
+  target_resource_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_cluster_name}"
+  log_analytics_workspace_id = var.log_analytics_workspace_id
 
-  metric {
+  metrics {
     category = "AllMetrics"
     enabled  = true
-  }
+    retention_policy {
+      enabled = false
+    }
 log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
