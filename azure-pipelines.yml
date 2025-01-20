@@ -83,7 +83,7 @@ stages:
         if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" ]]; then
           terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
         else
-          terraform apply -auto-approve -target=azurerm_storage_container.example
+          echo "Storage container exists, skipping creation."
         fi
 
         # Import or Create Log Analytics Workspace
@@ -100,7 +100,6 @@ stages:
           # If the diagnostic setting does not exist, create it
           terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
         else
-          terraform import azurerm_monitor_diagnostic_setting.example "$DIAGNOSTIC_SETTING_ID"
           echo "Diagnostic setting '$(diagnostic_setting_name)' already exists, skipping creation."
         fi
       displayName: 'Import or Create Resources Dynamically'
@@ -117,6 +116,7 @@ stages:
         ARM_CLIENT_SECRET: $(azure_client_secret)
         ARM_TENANT_ID: $(azure_tenant_id)
         ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
+
 
 
 - stage: DeployMonitoring
