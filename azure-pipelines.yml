@@ -106,12 +106,12 @@ stages:
       displayName: 'Import or Create Resources Dynamically'
 
     - script: |
-        # Plan Terraform changes
+        # Plan Terraform changes without -target
         terraform plan -out=tfplan
       displayName: 'Terraform Plan'
     
     - script: |
-        # Apply Terraform changes
+        # Apply Terraform changes for all resources
         terraform apply -auto-approve tfplan
       displayName: 'Terraform Apply'
       env:
@@ -134,4 +134,22 @@ stages:
         az account set --subscription $(azure_subscription_id)
 
         # Get AKS Credentials
-        az aks get-credentials
+        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+
+        # Install Helm
+        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+        # Add Helm repositories
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo update
+
+        # Install Prometheus and Grafana using Helm
+        helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer
+
+        # Verify deployments
+        kubectl get pods -n monitoring
+      displayName: 'Install Prometheus and Grafana via Helm'
+      env:
+        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
