@@ -5,8 +5,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Update if needed
   terraformVarsFile: 'terraform.tfvars'  # Path to your TFvar file in the repository
+  terraformVersion: '1.3.5'  # Specify the version of Terraform to use
 
 stages:
 - stage: Terraform
