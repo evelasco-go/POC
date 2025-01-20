@@ -40,6 +40,9 @@ stages:
         # Import the resource group if it already exists
         terraform import azurerm_resource_group.example "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)"
 
+        # Import existing Monitor Diagnostic Setting if it exists
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/poc-aks-metrics-diagnosticpoc"
+        
         # Plan Terraform changes
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
       displayName: 'Terraform Init, Import Resource Group and Plan'
@@ -52,7 +55,7 @@ stages:
         echo "Checking state for azurerm_monitor_diagnostic_setting.aks_metrics..."
         if ! terraform state show azurerm_monitor_diagnostic_setting.aks_metrics > /dev/null 2>&1; then
           echo "State misalignment detected. Re-importing resource..."
-          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/aks-metrics"
+          terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(AZURE_SUBSCRIPTION_ID)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/aks-metrics|aks-metrics"
         else
           echo "State is already aligned. Proceeding..."
         fi
