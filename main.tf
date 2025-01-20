@@ -138,7 +138,7 @@ resource "azurerm_log_analytics_workspace" "example" {
 # Monitor Diagnostic Setting Resource
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name               = "aks-metrics-setting"
-  target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_cluster_name}"
+  target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
 
   metric {
     category = "AllMetrics"
