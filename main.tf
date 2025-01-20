@@ -1,3 +1,16 @@
+terraform {
+  required_providers {
+    azurerm = {
+      source = "hashicorp/azurerm"
+      version = "~> 3.0"  # Specify a version here
+    }
+    random = {
+      source = "hashicorp/random"
+      version = "~> 3.0"  # Specify a version here
+    }
+  }
+}
+
 # Provider configuration for Azure
 provider "azurerm" {
   features {}
@@ -7,6 +20,10 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# Provider configuration for random ID generation
+provider "random" {}
+
+# Define variables
 variable "azure_subscription_id" {}
 variable "azure_client_id" {}
 variable "azure_client_secret" {}
@@ -51,10 +68,12 @@ output "kubeconfig" {
   sensitive = true
 }
 
+# Random unique suffix for naming resources
 resource "random_id" "unique_suffix" {
   byte_length = 8
 }
 
+# Azure Storage Account
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
   resource_group_name       = var.resource_group_name
@@ -75,17 +94,18 @@ resource "azurerm_log_analytics_workspace" "example" {
   name                = var.log_analytics_workspace_name
   location            = var.location
   resource_group_name = azurerm_resource_group.example.name
-  sku                 = "PerGB2018"
+  sku                 = var.log_analytics_sku
 }
 
-# Monitor Diagnostic Setting Resource
+# Monitor Diagnostic Setting Resource for AKS
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = "aks-metrics-setting"
+  name               = var.diagnostic_setting_name
   target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
 
   metric {
     category = "AllMetrics"
     enabled  = true
-}
-log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  }
+
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
