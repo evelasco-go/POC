@@ -47,9 +47,9 @@ stages:
         terraform import azurerm_resource_group.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
         terraform import azurerm_kubernetes_cluster.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         terraform import azurerm_storage_account.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-        terraform import azurerm_storage_container.example "$(storage_account_name)/default/$(container_name)"
+        terraform import azurerm_storage_container.example "https://$(storage_account_name).blob.core.windows.net/$(container_name)"
         terraform import azurerm_log_analytics_workspace.example "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/diagnosticSettings/$(diagnostic_setting_name)"
+        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
       displayName: 'Import Existing Resources into Terraform State'
 
     - script: |
