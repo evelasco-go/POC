@@ -27,6 +27,8 @@ stages:
       displayName: 'Azure CLI Login'
     
     - script: |
+        terraform init
+
         # Dynamically extract variables from terraform.tfvars
         export TFVARS=$(cat $(terraformVarsFile) | grep -v '^#' | sed 's/ *= */=/g')
         for var in $TFVARS; do
@@ -64,7 +66,7 @@ stages:
         echo "Log Analytics Workspace Name: $TF_log_analytics_workspace_name"
         
         # Initialize Terraform and download dependencies
-        terraform init
+        # terraform init
 
         # Plan Terraform changes, referencing the terraform.tfvars file
         terraform plan -var-file=$(terraformVarsFile) -out=tfplan
