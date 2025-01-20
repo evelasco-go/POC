@@ -73,16 +73,6 @@ variable "log_analytics_sku" {
   type        = string
 }
 
-variable "azureSubscription" {
-  description = "Azure Subscription ID"
-  type        = string
-}
-
-variable "subscription_id" {
-  description = "The ID of the Azure subscription."
-  type        = string
-}
-
 variable "aks_cluster_name" {
   description = "The name of the AKS cluster."
   type        = string
