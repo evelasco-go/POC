@@ -68,6 +68,11 @@ variable "log_analytics_workspace_name" {
   type        = string
 }
 
+variable "log_analytics_sku" {
+  description = "The name of the Log Analytics SKU"
+  type        = string
+}
+
 variable "azureSubscription" {
   description = "Azure Subscription ID"
   type        = string
