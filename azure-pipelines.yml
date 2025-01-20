@@ -97,7 +97,7 @@ stages:
 
         if [[ -z "$EXISTING_DIAGNOSTIC_SETTING" ]]; then
           # If the diagnostic setting does not exist, create it
-          terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
+          terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.example
         else
           echo "Diagnostic setting '$(diagnostic_setting_name)' already exists, skipping creation."
         fi
