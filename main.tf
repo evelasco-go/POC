@@ -84,10 +84,11 @@ resource "azurerm_storage_account" "example" {
 
 # Storage Container Resource
 resource "azurerm_storage_container" "example" {
-  name                  = var.container_name
-  storage_account_id    = azurerm_storage_account.example.id
+  name                  = var.container_name           # Use tfstate or the desired container name
+  storage_account_name  = var.storage_account_name     # Use pocstoragepcpc or your storage account variable
   container_access_type = "private"
 }
+
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
