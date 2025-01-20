@@ -11,4 +11,3 @@ location                     = "East US"
 log_analytics_workspace_name = "pocanalyticspcpcpcpoc"
 log_analytics_sku            = "PerGB2018"
 diagnostic_setting_name      = "pocdiagnosticpocpcpcpcpoc"
-
