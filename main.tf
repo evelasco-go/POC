@@ -69,9 +69,9 @@ resource "azurerm_kubernetes_cluster" "example" {
   }
 }
 
-# Output kubeconfig (sensitive)
+# Output kubeconfig (sensitive) - use count.index to reference the specific instance
 output "kubeconfig" {
-  value     = azurerm_kubernetes_cluster.example.kube_config
+  value     = azurerm_kubernetes_cluster.example[0].kube_config
   sensitive = true
 }
 
@@ -117,7 +117,7 @@ resource "azurerm_log_analytics_workspace" "example" {
   sku                  = var.log_analytics_sku
 }
 
-# Monitor Diagnostic Setting Resource for AKS
+# Monitor Diagnostic Setting Resource for AKS - use count.index to reference the specific instance
 resource "azurerm_monitor_diagnostic_setting" "example" {
   name               = var.diagnostic_setting_name
   target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
@@ -127,5 +127,5 @@ resource "azurerm_monitor_diagnostic_setting" "example" {
     enabled  = true
   }
 
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example[0].id
 }
