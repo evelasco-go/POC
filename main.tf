@@ -54,7 +54,7 @@ resource "azurerm_resource_group" "example" {
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = var.location
-  resource_group_name = azurerm_resource_group.example.name
+  resource_group_name = azurerm_resource_group.example[0].name # Access using [0] for the first instance
   dns_prefix          = "aks-cluster"
 
   default_node_pool {
@@ -111,7 +111,7 @@ resource "azurerm_storage_container" "example" {
 resource "azurerm_log_analytics_workspace" "example" {
   name                = var.log_analytics_workspace_name
   location            = var.location
-  resource_group_name = azurerm_resource_group.example.name
+  resource_group_name = azurerm_resource_group.example[0].name # Access using [0] for the first instance
   sku                 = var.log_analytics_sku
 }
 
