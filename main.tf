@@ -2,11 +2,11 @@ terraform {
   required_providers {
     azurerm = {
       source = "hashicorp/azurerm"
-      version = "~> 3.0"  # Specify a version here
+      version = "~> 3.0"
     }
     random = {
       source = "hashicorp/random"
-      version = "~> 3.0"  # Specify a version here
+      version = "~> 3.0"
     }
   }
 }
@@ -38,26 +38,38 @@ variable "log_analytics_workspace_name" {}
 variable "log_analytics_sku" {}
 variable "diagnostic_setting_name" {}
 
-# Resource group (data block to check if exists)
+# Data source for existing resource group
 data "azurerm_resource_group" "existing" {
   name = var.resource_group_name
 }
 
-# Azure Kubernetes Service Cluster (only create if resource group exists)
+# Data source for existing storage account
+data "azurerm_storage_account" "existing" {
+  name                = var.storage_account_name
+  resource_group_name = var.resource_group_name
+}
+
+# Data source for existing storage container
+data "azurerm_storage_container" "existing" {
+  name                  = var.container_name
+  storage_account_name  = var.storage_account_name
+}
+
+# If the resource group does not exist, create it
 resource "azurerm_resource_group" "example" {
   count    = length(data.azurerm_resource_group.existing.id) == 0 ? 1 : 0
   name     = var.resource_group_name
   location = var.location
 }
 
-# Azure Kubernetes Service Cluster
+# Azure Kubernetes Service Cluster (only create if resource group exists)
 resource "azurerm_kubernetes_cluster" "example" {
   count                = length(data.azurerm_resource_group.existing.id) > 0 ? 0 : 1
   name                 = var.aks_name
   location             = var.location
-  resource_group_name  = length(data.azurerm_resource_group.existing.id) > 0 ? data.azurerm_resource_group.existing.name : azurerm_resource_group.example[0].name
+  resource_group_name  = azurerm_resource_group.example[0].name
   dns_prefix           = "aks-cluster"
-  
+
   default_node_pool {
     name       = "default"
     node_count = var.node_count
@@ -69,19 +81,13 @@ resource "azurerm_kubernetes_cluster" "example" {
   }
 }
 
-# Output kubeconfig (sensitive) - use count.index to reference the specific instance
+# Output kubeconfig (sensitive)
 output "kubeconfig" {
   value     = azurerm_kubernetes_cluster.example[0].kube_config
   sensitive = true
 }
 
 # Azure Storage Account (check if it exists)
-data "azurerm_storage_account" "existing" {
-  name                = var.storage_account_name
-  resource_group_name = var.resource_group_name
-}
-
-# If the storage account does not exist, create it
 resource "azurerm_storage_account" "example" {
   count                     = length(data.azurerm_storage_account.existing.id) == 0 ? 1 : 0
   name                      = var.storage_account_name
@@ -92,12 +98,6 @@ resource "azurerm_storage_account" "example" {
 }
 
 # Storage Container Resource (check if it exists)
-data "azurerm_storage_container" "existing" {
-  name                  = var.container_name
-  storage_account_name  = var.storage_account_name
-}
-
-# If the storage container does not exist, create it
 resource "azurerm_storage_container" "example" {
   count                    = length(data.azurerm_storage_container.existing.id) == 0 ? 1 : 0
   name                     = var.container_name
@@ -108,16 +108,16 @@ resource "azurerm_storage_container" "example" {
   }
 }
 
-# Log Analytics Workspace Resource
+# Log Analytics Workspace Resource (check if it exists)
 resource "azurerm_log_analytics_workspace" "example" {
   count                = length(data.azurerm_resource_group.existing.id) > 0 ? 0 : 1
   name                 = var.log_analytics_workspace_name
   location             = var.location
-  resource_group_name  = length(data.azurerm_resource_group.existing.id) > 0 ? data.azurerm_resource_group.existing.name : azurerm_resource_group.example[0].name
+  resource_group_name  = azurerm_resource_group.example[0].name
   sku                  = var.log_analytics_sku
 }
 
-# Monitor Diagnostic Setting Resource for AKS - use count.index to reference the specific instance
+# Monitor Diagnostic Setting Resource for AKS - proper indexing
 resource "azurerm_monitor_diagnostic_setting" "example" {
   name               = var.diagnostic_setting_name
   target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
