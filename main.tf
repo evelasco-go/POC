@@ -84,16 +84,12 @@ resource "azurerm_storage_account" "example" {
 
 # Storage Container Resource
 resource "azurerm_storage_container" "example" {
-  count           = local.storage_container_exists ? 0 : 1
-  name            = "pctfstate"
-  storage_account_name = azurerm_storage_account.example.name
+  name                  = var.container_name
+  storage_account_name  = var.storage_account_name
   container_access_type = "private"
-}
-
-locals {
-  storage_container_exists = can(
-    azurerm_storage_container.example.id
-  )
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 
