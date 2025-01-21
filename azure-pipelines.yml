@@ -27,26 +27,31 @@ stages:
     displayName: 'Import Resources'
     steps:
     - script: |
+        # Install Terraform and dependencies
         curl -LO https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh
         chmod +x install_linux.sh && ./install_linux.sh
         curl -sSL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
+        # Log in to Azure
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
+        # Initialize Terraform
         terraform init
 
+        # Define resource IDs
         RESOURCE_GROUP_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
         STORAGE_ACCOUNT_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
         STORAGE_CONTAINER_ID="https://$(storage_account_name).blob.core.windows.net/$(container_name)"
         AKS_CLUSTER_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         LOG_ANALYTICS_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
 
-        terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID" || true
-        terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID" || true
-        terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID" || true
-        terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID" || true
-        terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID" || true
+        # Import resources into Terraform state if not already imported
+        terraform state show azurerm_resource_group.example || terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
+        terraform state show azurerm_storage_account.example || terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
+        terraform state show azurerm_storage_container.example || terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
+        terraform state show azurerm_kubernetes_cluster.example || terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
+        terraform state show azurerm_log_analytics_workspace.example || terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID"
       displayName: 'Import Resources into Terraform'
 
 - stage: Terraform
@@ -76,19 +81,23 @@ stages:
     displayName: 'Deploy Prometheus and Grafana via Helm'
     steps:
     - script: |
+        # Log in to Azure and configure Kubernetes context
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
-
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
+        # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
+        # Add Helm repositories and deploy monitoring tools
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
 
+        # Install Prometheus and Grafana
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
         helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
 
+        # Verify deployments
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
