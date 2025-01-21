@@ -11,10 +11,9 @@ terraform {
   }
 
   backend "azurerm" {
-    # Replace these with explicit values or use a separate `terraform.tfvars`
-    resource_group_name  = "pcPOCresourcepcpcpcpoc"
-    storage_account_name = "pcpocstoragepcpcpcpoc"
-    container_name       = "pctfstate"
+    resource_group_name  = var.resource_group_name
+    storage_account_name = var.storage_account_name
+    container_name       = var.container_name
     key                  = "terraform.tfstate"
   }
 }
