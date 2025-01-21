@@ -1,17 +1,24 @@
 terraform {
   required_providers {
     azurerm = {
-      source = "hashicorp/azurerm"
-      version = "~> 3.0"  # Specify a version here
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
     }
     random = {
-      source = "hashicorp/random"
-      version = "~> 3.0"  # Specify a version here
+      source  = "hashicorp/random"
+      version = "~> 3.0"
     }
+  }
+
+  backend "azurerm" {
+    # Replace these with explicit values or use a separate `terraform.tfvars`
+    resource_group_name  = "pcPOCresourcepcpcpcpoc"
+    storage_account_name = "pcpocstoragepcpcpcpoc"
+    container_name       = "pctfstate"
+    key                  = "terraform.tfstate"
   }
 }
 
-# Provider configuration for Azure
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -20,7 +27,6 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
-# Provider configuration for random ID generation
 provider "random" {}
 
 # Define variables
@@ -43,16 +49,6 @@ resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
 }
-
-terraform {
-  backend "azurerm" {
-    resource_group_name  = var.resource_group_name
-    storage_account_name = var.storage_account_name
-    container_name       = var.container_name
-    key                  = "terraform.tfstate"
-  }
-}
-
 
 # Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
@@ -78,13 +74,12 @@ output "kubeconfig" {
   sensitive = true
 }
 
-
 # Azure Storage Account
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
-  resource_group_name       = var.resource_group_name
+  resource_group_name      = var.resource_group_name
   location                 = var.location
-  account_tier              = "Standard"
+  account_tier             = "Standard"
   account_replication_type = "LRS"
 }
 
@@ -97,7 +92,6 @@ resource "azurerm_storage_container" "example" {
     prevent_destroy = true
   }
 }
-
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
