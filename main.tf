@@ -44,6 +44,16 @@ resource "azurerm_resource_group" "example" {
   location = var.location
 }
 
+terraform {
+  backend "azurerm" {
+    resource_group_name  = var.resource_group_name
+    storage_account_name = var.storage_account_name
+    container_name       = var.container_name
+    key                  = "terraform.tfstate"
+  }
+}
+
+
 # Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
@@ -68,10 +78,6 @@ output "kubeconfig" {
   sensitive = true
 }
 
-# Random unique suffix for naming resources
-resource "random_id" "unique_suffix" {
-  byte_length = 8
-}
 
 # Azure Storage Account
 resource "azurerm_storage_account" "example" {
