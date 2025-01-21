@@ -130,4 +130,6 @@ resource "azurerm_monitor_diagnostic_setting" "example" {
     category = "AllMetrics"
     enabled  = true
   }
-  depends_on = [azurerm_kubernetes_c
+  
+  depends_on = [azurerm_kubernetes_cluster.example]  # Ensure AKS is created first
+}
