@@ -1,16 +1,17 @@
 terraform {
   required_providers {
     azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      source = "hashicorp/azurerm"
+      version = "~> 3.0"  # Specify a version here
     }
     random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
+      source = "hashicorp/random"
+      version = "~> 3.0"  # Specify a version here
     }
   }
 }
 
+# Provider configuration for Azure
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -19,6 +20,7 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# Provider configuration for random ID generation
 provider "random" {}
 
 # Define variables
@@ -66,12 +68,13 @@ output "kubeconfig" {
   sensitive = true
 }
 
+
 # Azure Storage Account
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
-  resource_group_name      = var.resource_group_name
+  resource_group_name       = var.resource_group_name
   location                 = var.location
-  account_tier             = "Standard"
+  account_tier              = "Standard"
   account_replication_type = "LRS"
 }
 
@@ -84,6 +87,7 @@ resource "azurerm_storage_container" "example" {
     prevent_destroy = true
   }
 }
+
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
