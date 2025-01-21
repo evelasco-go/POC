@@ -55,19 +55,20 @@ data "azurerm_storage_container" "existing" {
   storage_account_name  = var.storage_account_name
 }
 
-# If the resource group does not exist, create it
+# If resource group does not exist, create it
 resource "azurerm_resource_group" "example" {
-  count    = length(data.azurerm_resource_group.existing.id) == 0 ? 1 : 0
   name     = var.resource_group_name
   location = var.location
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
-# Azure Kubernetes Service Cluster (only create if resource group exists)
+# Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
-  count                = length(data.azurerm_resource_group.existing.id) > 0 ? 0 : 1
   name                 = var.aks_name
   location             = var.location
-  resource_group_name  = azurerm_resource_group.example[0].name
+  resource_group_name  = azurerm_resource_group.example.name
   dns_prefix           = "aks-cluster"
 
   default_node_pool {
@@ -79,53 +80,54 @@ resource "azurerm_kubernetes_cluster" "example" {
   identity {
     type = "SystemAssigned"
   }
+
+  depends_on = [azurerm_resource_group.example]  # Ensure resource group is created before AKS
 }
 
 # Output kubeconfig (sensitive)
 output "kubeconfig" {
-  value     = azurerm_kubernetes_cluster.example[0].kube_config
+  value     = azurerm_kubernetes_cluster.example.kube_config
   sensitive = true
 }
 
-# Azure Storage Account (check if it exists)
+# Azure Storage Account
 resource "azurerm_storage_account" "example" {
-  count                     = length(data.azurerm_storage_account.existing.id) == 0 ? 1 : 0
-  name                      = var.storage_account_name
-  resource_group_name       = var.resource_group_name
+  name                     = var.storage_account_name
+  resource_group_name       = azurerm_resource_group.example.name
   location                 = var.location
   account_tier              = "Standard"
   account_replication_type = "LRS"
+  depends_on = [azurerm_resource_group.example]  # Ensure resource group is created first
 }
 
-# Storage Container Resource (check if it exists)
+# Storage Container Resource
 resource "azurerm_storage_container" "example" {
-  count                    = length(data.azurerm_storage_container.existing.id) == 0 ? 1 : 0
   name                     = var.container_name
-  storage_account_name     = var.storage_account_name
+  storage_account_name     = azurerm_storage_account.example.name
   container_access_type    = "private"
   lifecycle {
     prevent_destroy = true
   }
+  depends_on = [azurerm_storage_account.example]  # Ensure storage account is created first
 }
 
-# Log Analytics Workspace Resource (check if it exists)
+# Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
-  count                = length(data.azurerm_resource_group.existing.id) > 0 ? 0 : 1
   name                 = var.log_analytics_workspace_name
   location             = var.location
-  resource_group_name  = azurerm_resource_group.example[0].name
+  resource_group_name  = azurerm_resource_group.example.name
   sku                  = var.log_analytics_sku
+  depends_on = [azurerm_resource_group.example]  # Ensure resource group is created first
 }
 
-# Monitor Diagnostic Setting Resource for AKS - proper indexing
+# Monitor Diagnostic Setting Resource for AKS
 resource "azurerm_monitor_diagnostic_setting" "example" {
-  name               = var.diagnostic_setting_name
-  target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
+  name                      = var.diagnostic_setting_name
+  target_resource_id        = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 
   metric {
     category = "AllMetrics"
     enabled  = true
   }
-
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.example[0].id
-}
+  depends_on = [azurerm_kubernetes_c
