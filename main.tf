@@ -38,13 +38,19 @@ variable "log_analytics_workspace_name" {}
 variable "log_analytics_sku" {}
 variable "diagnostic_setting_name" {}
 
-# Resource group
+# Resource group (using data source to check if it exists)
+data "azurerm_resource_group" "existing" {
+  name = var.resource_group_name
+}
+
+# If the resource group does not exist, create it
 resource "azurerm_resource_group" "example" {
+  count    = length(data.azurerm_resource_group.existing.id) == 0 ? 1 : 0
   name     = var.resource_group_name
   location = var.location
 }
 
-# Azure Kubernetes Service Cluster
+# Azure Kubernetes Service Cluster (check if it exists and create if not)
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = var.location
@@ -68,26 +74,38 @@ output "kubeconfig" {
   sensitive = true
 }
 
+# Azure Storage Account (check if it exists)
+data "azurerm_storage_account" "existing" {
+  name                = var.storage_account_name
+  resource_group_name = var.resource_group_name
+}
 
-# Azure Storage Account
+# If the storage account does not exist, create it
 resource "azurerm_storage_account" "example" {
-  name                     = var.storage_account_name
+  count                     = length(data.azurerm_storage_account.existing.id) == 0 ? 1 : 0
+  name                      = var.storage_account_name
   resource_group_name       = var.resource_group_name
   location                 = var.location
   account_tier              = "Standard"
   account_replication_type = "LRS"
 }
 
-# Storage Container Resource
-resource "azurerm_storage_container" "example" {
+# Storage Container Resource (check if it exists)
+data "azurerm_storage_container" "existing" {
   name                  = var.container_name
   storage_account_name  = var.storage_account_name
-  container_access_type = "private"
+}
+
+# If the storage container does not exist, create it
+resource "azurerm_storage_container" "example" {
+  count                    = length(data.azurerm_storage_container.existing.id) == 0 ? 1 : 0
+  name                     = var.container_name
+  storage_account_name     = var.storage_account_name
+  container_access_type    = "private"
   lifecycle {
     prevent_destroy = true
   }
 }
-
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
