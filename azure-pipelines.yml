@@ -41,6 +41,40 @@ stages:
       displayName: 'Terraform Init'
 
     - script: |
+        check_and_import() {
+          local resource_id="$1"
+          local resource_type="$2"
+          terraform state list | grep "$resource_type" | grep "$resource_id" || terraform import "$resource_type" "$resource_id"
+        }
+
+        # Check and Import Resource Group
+        RESOURCE_GROUP_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
+        check_and_import "$RESOURCE_GROUP_ID" "azurerm_resource_group.example"
+
+        # Check and Import Storage Account
+        STORAGE_ACCOUNT_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
+        check_and_import "$STORAGE_ACCOUNT_ID" "azurerm_storage_account.example"
+
+        # Check and Import Storage Container
+        STORAGE_CONTAINER_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name)"
+        check_and_import "$STORAGE_CONTAINER_ID" "azurerm_storage_container.example"
+
+        # Check and Import AKS Cluster
+        AKS_CLUSTER_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
+        check_and_import "$AKS_CLUSTER_ID" "azurerm_kubernetes_cluster.example"
+
+        # Check and Import Log Analytics Workspace
+        LOG_ANALYTICS_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
+        check_and_import "$LOG_ANALYTICS_ID" "azurerm_log_analytics_workspace.example"
+
+        # Check and Import Diagnostic Setting
+        DIAGNOSTIC_SETTING_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)/providers/Microsoft.Insights/diagnosticSettings/$(diagnostic_setting_name)"
+        check_and_import "$DIAGNOSTIC_SETTING_ID" "azurerm_monitor_diagnostic_setting.example"
+
+        terraform plan -out=tfplan
+      displayName: 'Terraform Plan'
+
+    - script: |
         terraform apply -auto-approve
       displayName: 'Terraform Apply'
       env:
