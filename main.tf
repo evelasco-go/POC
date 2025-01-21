@@ -38,25 +38,26 @@ variable "log_analytics_workspace_name" {}
 variable "log_analytics_sku" {}
 variable "diagnostic_setting_name" {}
 
-# Resource group (using data source to check if it exists)
+# Resource group (data block to check if exists)
 data "azurerm_resource_group" "existing" {
   name = var.resource_group_name
 }
 
-# If the resource group does not exist, create it
+# Azure Kubernetes Service Cluster (only create if resource group exists)
 resource "azurerm_resource_group" "example" {
   count    = length(data.azurerm_resource_group.existing.id) == 0 ? 1 : 0
   name     = var.resource_group_name
   location = var.location
 }
 
-# Azure Kubernetes Service Cluster (check if it exists and create if not)
+# Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
-  name                = var.aks_name
-  location            = var.location
-  resource_group_name = azurerm_resource_group.example[0].name # Access using [0] for the first instance
-  dns_prefix          = "aks-cluster"
-
+  count                = length(data.azurerm_resource_group.existing.id) > 0 ? 0 : 1
+  name                 = var.aks_name
+  location             = var.location
+  resource_group_name  = length(data.azurerm_resource_group.existing.id) > 0 ? data.azurerm_resource_group.existing.name : azurerm_resource_group.example[0].name
+  dns_prefix           = "aks-cluster"
+  
   default_node_pool {
     name       = "default"
     node_count = var.node_count
@@ -109,10 +110,11 @@ resource "azurerm_storage_container" "example" {
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
-  name                = var.log_analytics_workspace_name
-  location            = var.location
-  resource_group_name = azurerm_resource_group.example[0].name # Access using [0] for the first instance
-  sku                 = var.log_analytics_sku
+  count                = length(data.azurerm_resource_group.existing.id) > 0 ? 0 : 1
+  name                 = var.log_analytics_workspace_name
+  location             = var.location
+  resource_group_name  = length(data.azurerm_resource_group.existing.id) > 0 ? data.azurerm_resource_group.existing.name : azurerm_resource_group.example[0].name
+  sku                  = var.log_analytics_sku
 }
 
 # Monitor Diagnostic Setting Resource for AKS
