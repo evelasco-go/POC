@@ -137,6 +137,20 @@ stages:
         helm repo add azuremonitor https://azure.github.io/azure-monitor-openshift-prometheus-helm-charts/
         helm repo update
 
+        # Enable Managed Prometheus in Log Analytics Workspace
+        az monitor log-analytics workspace pack enable \
+          --resource-group $(resource_group_name) \
+          --workspace-name $(log_analytics_workspace_name) \
+          --pack-name ContainerInsights
+
+        az monitor log-analytics workspace data-export create \
+          --name PrometheusMetricsExport \
+          --resource-group $(resource_group_name) \
+          --workspace-name $(log_analytics_workspace_name) \
+          --destination /subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name) \
+          --table-name PrometheusMetrics \
+          --enable-all-tables
+
         # Install Azure Monitor Prometheus Agent
         helm install azure-prometheus azuremonitor/prometheus-aks \
           --namespace kube-system \
