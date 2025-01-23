@@ -6,10 +6,11 @@ node_count                   = 2
 location                     = "East US"
 log_analytics_sku            = "PerGB2018"
 
-resource_group_name          = "pcresource321321321321"
-storage_account_name         = "pcstorage321321321321"
-container_name               = "pctfstate321321321321"
-aks_name                     = "POCAKSCluster321321321321"
-log_analytics_workspace_name = "analytics321321321321"
-diagnostic_setting_name      = "diagnostic321321321321"
+resource_group_name          = "Goreg3-resource""
+storage_account_name         = "goreg3storage"
+container_name               = "goreg3container"
+aks_name                     = "goreg3-aks"
+log_analytics_workspace_name = "goreg3-analytics"
+diagnostic_setting_name      = "goreg3-diagnostics"
+
 
