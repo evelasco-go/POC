@@ -125,34 +125,29 @@ stages:
     displayName: 'Deploy Prometheus and Grafana via Helm'
     steps:
     - script: |
+        # Login to Azure
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
+        # Get AKS credentials
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
+        # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
+        # Add Helm charts for Prometheus, Grafana, and Azure Monitor
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo add azuremonitor https://azure.github.io/azure-monitor-openshift-prometheus-helm-charts/
         helm repo update
 
-        # Enable Managed Prometheus in Log Analytics Workspace
+        # Enable Azure Monitor for Containers and Prometheus integration
         az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
           --workspace-name $(log_analytics_workspace_name) \
           --pack-name ContainerInsights
 
-        # Enable Prometheus metrics export to storage account (optional)
-        az monitor log-analytics workspace data-export create \
-          --name PrometheusMetricsExport \
-          --resource-group $(resource_group_name) \
-          --workspace-name $(log_analytics_workspace_name) \
-          --destination /subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)/blobServices/default/containers/$(container_name) \
-          --table-name PrometheusMetrics \
-          --enable-all-tables
-
-        # Install Azure Monitor Prometheus Agent to collect Prometheus metrics
+        # Enable Prometheus monitoring solution
         helm install azure-prometheus azuremonitor/prometheus-aks \
           --namespace kube-system \
           --set azureMonitor.workspaceResourceId="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
@@ -160,7 +155,7 @@ stages:
           --set azureMonitor.prometheus.scrapeInterval=30s \
           --wait
 
-        # Install Prometheus and Grafana with proper integration
+        # Install Prometheus monitoring stack with Azure Monitor integration
         helm install prometheus prometheus-community/kube-prometheus-stack \
           --namespace monitoring \
           --create-namespace \
@@ -168,19 +163,21 @@ stages:
           --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.azureMonitor=true \
           --wait
 
+        # Install Grafana with service exposure and set up initial password
         helm install grafana grafana/grafana \
           --namespace monitoring \
           --set adminPassword='yourpassword' \
           --set service.type=LoadBalancer \
           --wait
 
-        # Configure Azure Monitor diagnostic settings for AKS (Ensure metrics are available)
+        # Configure diagnostic settings for AKS to enable metrics
         az monitor diagnostic-settings create \
           --name "$(diagnostic_setting_name)" \
           --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
           --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
           --metrics '[{"category": "AllMetrics", "enabled": true}]'
 
+        # Verify the Prometheus and Grafana pods are running
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus, Grafana, and Configure Insights'
       env:
