@@ -13,4 +13,3 @@ aks_name                     = "goreg3-aks"
 log_analytics_workspace_name = "goreg3-analytics"
 diagnostic_setting_name      = "goreg3-diagnostics"
 
-
