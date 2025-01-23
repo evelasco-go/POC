@@ -119,7 +119,7 @@ stages:
 
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
-  dependsOn: Terraform
+  dependsOn: []
   jobs:
   - job: HelmDeployment
     displayName: 'Deploy Prometheus and Grafana via Helm'
@@ -134,12 +134,39 @@ stages:
 
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo add azuremonitor https://azure.github.io/azure-monitor-openshift-prometheus-helm-charts/
         helm repo update
 
-        helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
-        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
+        # Install Azure Monitor Prometheus Agent
+        helm install azure-prometheus azuremonitor/prometheus-aks \
+          --namespace kube-system \
+          --set azureMonitor.workspaceResourceId="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+          --set azureMonitor.prometheus.enabled=true \
+          --set azureMonitor.prometheus.scrapeInterval=30s \
+          --wait
+
+        # Install Prometheus and Grafana
+        helm install prometheus prometheus-community/kube-prometheus-stack \
+          --namespace monitoring \
+          --create-namespace \
+          --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+          --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.azureMonitor=true \
+          --wait
+
+        helm install grafana grafana/grafana \
+          --namespace monitoring \
+          --set adminPassword='yourpassword' \
+          --set service.type=LoadBalancer \
+          --wait
+
+        # Configure Azure Monitor diagnostic settings for AKS
+        az monitor diagnostic-settings create \
+          --name "$(diagnostic_setting_name)" \
+          --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+          --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+          --metrics '[{"category": "AllMetrics", "enabled": true}]'
 
         kubectl get pods -n monitoring
-      displayName: 'Install Prometheus and Grafana via Helm'
+      displayName: 'Install Prometheus, Grafana, and Configure Insights'
       env:
         KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
