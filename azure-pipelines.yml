@@ -143,6 +143,7 @@ stages:
           --workspace-name $(log_analytics_workspace_name) \
           --pack-name ContainerInsights
 
+        # Enable Prometheus metrics export to storage account (optional)
         az monitor log-analytics workspace data-export create \
           --name PrometheusMetricsExport \
           --resource-group $(resource_group_name) \
@@ -151,7 +152,7 @@ stages:
           --table-name PrometheusMetrics \
           --enable-all-tables
 
-        # Install Azure Monitor Prometheus Agent
+        # Install Azure Monitor Prometheus Agent to collect Prometheus metrics
         helm install azure-prometheus azuremonitor/prometheus-aks \
           --namespace kube-system \
           --set azureMonitor.workspaceResourceId="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
@@ -159,7 +160,7 @@ stages:
           --set azureMonitor.prometheus.scrapeInterval=30s \
           --wait
 
-        # Install Prometheus and Grafana
+        # Install Prometheus and Grafana with proper integration
         helm install prometheus prometheus-community/kube-prometheus-stack \
           --namespace monitoring \
           --create-namespace \
@@ -173,7 +174,7 @@ stages:
           --set service.type=LoadBalancer \
           --wait
 
-        # Configure Azure Monitor diagnostic settings for AKS
+        # Configure Azure Monitor diagnostic settings for AKS (Ensure metrics are available)
         az monitor diagnostic-settings create \
           --name "$(diagnostic_setting_name)" \
           --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
