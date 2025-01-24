@@ -48,7 +48,7 @@ stages:
 #         ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
 
 - stage: EnableMonitoring
-  displayName: 'Enable Container Logs, Prometheus, and Grafana'
+  displayName: 'Enable Monitoring Services'
   jobs:
   - job: SetupMonitoring
     displayName: 'Activate Monitoring Services'
@@ -58,14 +58,14 @@ stages:
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
-        # Enable Container Logs in the Log Analytics Workspace
+        # Enable Container Logs Intelligence Pack
         echo "Enabling Container Logs..."
         az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
           --workspace-name $(log_analytics_workspace_name) \
-          --pack-name ContainerInsights
+          --name ContainerInsights
 
-        # Enable Managed Prometheus Metrics in Azure Monitor Workspace
+        # Enable Prometheus Metrics in Azure Monitor Workspace
         echo "Enabling Prometheus metrics..."
         az monitor metrics workspace enable \
           --resource-group $(resource_group_name) \
@@ -73,20 +73,21 @@ stages:
 
         # Deploy Managed Grafana instance
         echo "Setting up Managed Grafana instance..."
-        az monitor managed-grafana create \
-          --resource-group $(resource_group_name) \
-          --workspace-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+        az extension add --name grafana
+        az grafana create \
           --name $(grafana_instance_name) \
+          --resource-group $(resource_group_name) \
           --location $(azure_region) \
-          --sku Standard
+          --sku Standard \
+          --identity-type SystemAssigned
 
-        # Set up Diagnostic Settings for AKS to enable monitoring
+        # Set up Diagnostic Settings for AKS
         echo "Configuring Diagnostic Settings for AKS..."
         az monitor diagnostic-settings create \
           --name "aks-diagnostics" \
           --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
           --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --metrics '[{"category": "AllMetrics", "enabled": true}, {"category": "Network", "enabled": true}]'
+          --metrics '[{"category": "AllMetrics", "enabled": true}]'
 
-        echo "All monitoring services have been enabled successfully."
+        echo "All monitoring services have been activated successfully."
       displayName: 'Activate Monitoring Services'
