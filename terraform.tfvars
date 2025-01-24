@@ -6,10 +6,10 @@ node_count                   = 2
 location                     = "East US"
 log_analytics_sku            = "PerGB2018"
 
-resource_group_name          = "Goreg3"
-storage_account_name         = "goreg3"
-container_name               = "goreg3container"
-aks_name                     = "goreg3-aks"
-log_analytics_workspace_name = "goreg3-analytics"
-diagnostic_setting_name      = "goreg3-diagnostics"
+resource_group_name          = "Goreg4"
+storage_account_name         = "goreg4"
+container_name               = "goreg4container"
+aks_name                     = "goreg4-aks"
+log_analytics_workspace_name = "goreg4-analytics"
+diagnostic_setting_name      = "goreg4-diagnostics"
 
