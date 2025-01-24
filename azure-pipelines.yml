@@ -1,8 +1,8 @@
 trigger:
-  - dev  # Trigger the pipeline on changes to the dev branch
+  - dev
 
 pool:
-  vmImage: 'ubuntu-latest'  # Specify the VM image for the pipeline
+  vmImage: 'ubuntu-latest'
 
 variables:
   azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
@@ -66,16 +66,16 @@ stages:
           --workspace-name $(log_analytics_workspace_name) \
           --name ContainerInsights
 
-        # Enable Prometheus Metrics in Azure Monitor Workspace
+        # Enable Prometheus Metrics in Azure Monitor Workspace (Ensure Prometheus is available)
         echo "Enabling Prometheus metrics..."
         az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
           --workspace-name $(log_analytics_workspace_name) \
-          --name Prometheus
+          --name Prometheus || echo "Prometheus pack not available"
 
         # Install Grafana extension if not installed
         echo "Installing Grafana extension..."
-        az extension add --name grafana
+        az extension add --name grafana || az extension update --name grafana
 
         # Deploy Managed Grafana instance
         echo "Setting up Managed Grafana instance..."
@@ -84,9 +84,9 @@ stages:
           --resource-group $(resource_group_name) \
           --location $(azure_region) \
           --sku Standard \
-          --identity type=SystemAssigned
+          --enable-managed-identity
 
-        # Set up Diagnostic Settings for AKS (Check if already exists)
+        # Set up Diagnostic Settings for AKS
         echo "Configuring Diagnostic Settings for AKS..."
         az monitor diagnostic-settings list \
           --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" | grep 'goreg4-diagnostics'
