@@ -15,6 +15,7 @@ variables:
   diagnostic_setting_name: "goreg4-diagnostics"
   grafana_instance_name: "goreg4-grafana"
   azure_region: "East US"
+  azure_monitor_workspace_name: "defaultazuremonitorworkspace-eus"  # Add this line for Prometheus workspace
 
 stages:
 # Terraform Stage (Commented Out)
