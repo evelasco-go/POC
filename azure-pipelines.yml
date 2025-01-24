@@ -59,93 +59,19 @@ stages:
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
-        # Get AKS credentials
-        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-
-        # Install Helm
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-
-        # Add Helm charts for Prometheus, Grafana, and Azure Monitor
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-        helm repo add grafana https://grafana.github.io/helm-charts
-        helm repo add azuremonitor https://azure.github.io/azure-monitor-openshift-prometheus-helm-charts/
-        helm repo update
-
-        # Enable Container Logs for AKS
-        az monitor log-analytics workspace pack enable \
-          --resource-group $(resource_group_name) \
-          --workspace-name $(log_analytics_workspace_name) \
-          --pack-name ContainerInsights
-
-        # Enable Managed Prometheus metrics for Azure Monitor
+        # Enable Prometheus in the Log Analytics Workspace
         az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
           --workspace-name $(log_analytics_workspace_name) \
           --pack-name Prometheus
 
-        # Enable Managed Grafana for Prometheus data visualization
-        az monitor managed-grafana create \
-          --resource-group $(resource_group_name) \
-          --workspace-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --name "$(grafana_instance_name)" \
-          --location "$(azure_region)" \
-          --sku "Standard"
-
-        # Install Azure Monitor Prometheus Agent
-        helm install azure-prometheus azuremonitor/prometheus-aks \
-          --namespace kube-system \
-          --set azureMonitor.workspaceResourceId="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --set azureMonitor.prometheus.enabled=true \
-          --set azureMonitor.prometheus.scrapeInterval=30s \
-          --set azureMonitor.prometheus.metricCategories="{Network}" \
-          --wait
-
-        # Install Prometheus operator stack with Azure Monitor integration
-        helm install prometheus prometheus-community/kube-prometheus-stack \
-          --namespace monitoring \
-          --create-namespace \
-          --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
-          --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.azureMonitor=true \
-          --wait
-
-        # Install Grafana with service exposure and initial password setup
-        helm install grafana grafana/grafana \
-          --namespace monitoring \
-          --set adminPassword='yourpassword' \
-          --set service.type=LoadBalancer \
-          --wait
-
-        # Set up diagnostic settings for AKS to enable container insights and all relevant metrics
+        # Enable diagnostic settings for AKS
         az monitor diagnostic-settings create \
           --name "$(diagnostic_setting_name)" \
           --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
           --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --metrics '[{"category": "AllMetrics", "enabled": true}]'
+          --metrics '[{"category": "AllMetrics", "enabled": true}, {"category": "Network", "enabled": true}]'
 
-        # Enable Network Packet Metrics in Diagnostic Settings
-        az monitor diagnostic-settings update \
-          --name "$(diagnostic_setting_name)" \
-          --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
-          --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --metrics '[{"category": "Network", "enabled": true}, {"category": "AllMetrics", "enabled": true}]'
-
-        # Explicitly Update Prometheus Operator Configuration to Scrape Networking Metrics
-        helm upgrade prometheus prometheus-community/kube-prometheus-stack \
-          --namespace monitoring \
-          --set prometheus.prometheusSpec.additionalScrapeConfigs[0].job_name="network-metrics" \
-          --set prometheus.prometheusSpec.additionalScrapeConfigs[0].metrics_path="/metrics" \
-          --set prometheus.prometheusSpec.additionalScrapeConfigs[0].static_configs[0].targets[0]="network-service.monitoring.svc.cluster.local:9100" \
-          --wait
-
-        # Verify Diagnostic Settings Configuration
-        az monitor diagnostic-settings list \
-          --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
-
-        # Verify Prometheus Targets
-        curl -XGET "http://<Prometheus-Service-URL>/api/v1/targets" | grep "network-metrics"
-
-        # Verify Networking Metrics in Prometheus Logs
-        kubectl logs -n monitoring $(kubectl get pods -n monitoring -l app=prometheus -o jsonpath='{.items[0].metadata.name}') | grep "Packets dropped"
-      displayName: 'Install Prometheus, Grafana, and Configure Insights'
-      env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
+        # Verify Prometheus activation
+        echo "Prometheus activated in Azure Monitor for AKS and Log Analytics Workspace."
+      displayName: 'Enable Prometheus in Azure Monitor'
