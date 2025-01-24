@@ -121,6 +121,34 @@ stages:
           --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
           --metrics '[{"category": "AllMetrics", "enabled": true}]'
 
+          # Enable Network Packet Metrics in Diagnostic Settings
+        az monitor diagnostic-settings update \
+          --name "$(diagnostic_setting_name)" \
+          --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+          --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+          --metrics '[{"category": "Network", "enabled": true}, {"category": "AllMetrics", "enabled": true}]'
+
+        # Configure Azure Monitor Prometheus Agent to scrape network metrics
+        helm upgrade --install azure-prometheus azuremonitor/prometheus-aks \
+          --namespace kube-system \
+          --set azureMonitor.workspaceResourceId="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+          --set azureMonitor.prometheus.enabled=true \
+          --set azureMonitor.prometheus.scrapeInterval=30s \
+          --set azureMonitor.prometheus.metricCategories="{Network}" \
+          --wait
+
+        # Update Prometheus operator to scrape network-related metrics
+        helm upgrade prometheus prometheus-community/kube-prometheus-stack \
+          --namespace monitoring \
+          --set prometheus.prometheusSpec.additionalScrapeConfigs[0].job_name="network-metrics" \
+          --set prometheus.prometheusSpec.additionalScrapeConfigs[0].metrics_path="/metrics" \
+          --set prometheus.prometheusSpec.additionalScrapeConfigs[0].static_configs[0].targets[0]="network-service.monitoring.svc.cluster.local:9100" \
+          --wait
+
+        # Validate Network Metrics in Prometheus
+        kubectl get servicemonitors -n monitoring
+        kubectl logs -n monitoring $(kubectl get pods -n monitoring -l app=prometheus -o jsonpath='{.items[0].metadata.name}')
+        
         # Verify the status of the deployed pods
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus, Grafana, and Configure Insights'
