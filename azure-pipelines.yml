@@ -73,7 +73,6 @@ stages:
 
         # Install Grafana extension if not installed
         echo "Installing Grafana extension..."
-        az config set extension.dynamic_install_allow_preview=true
         az extension add --name grafana
 
         # Deploy Managed Grafana instance
@@ -104,6 +103,7 @@ stages:
             --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
             --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
             --metrics '[{"category": "AllMetrics", "enabled": true}]'
+        fi
 
         echo "All monitoring services have been activated successfully."
       displayName: 'Activate Monitoring Services'
