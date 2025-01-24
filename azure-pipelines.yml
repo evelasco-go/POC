@@ -68,9 +68,9 @@ stages:
 
         # Enable Prometheus Metrics in Azure Monitor Workspace
         echo "Enabling Prometheus metrics..."
-        az monitor log-analytics workspace enable \
+        az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
-          --workspace-name $(azure_monitor_workspace_name) \
+          --workspace-name $(log_analytics_workspace_name) \
           --name Prometheus
 
         # Install Grafana extension if not installed
