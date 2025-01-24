@@ -1,8 +1,8 @@
 trigger:
-  - dev
+  - dev  # Trigger the pipeline on changes to the dev branch
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'  # Specify the VM image for the pipeline
 
 variables:
   azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
