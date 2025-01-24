@@ -71,9 +71,13 @@ stages:
           --resource-group $(resource_group_name) \
           --workspace-name $(azure_monitor_workspace_name)
 
+        # Install Grafana extension if not installed
+        echo "Installing Grafana extension..."
+        az config set extension.dynamic_install_allow_preview=true
+        az extension add --name grafana
+
         # Deploy Managed Grafana instance
         echo "Setting up Managed Grafana instance..."
-        az extension add --name grafana
         az grafana create \
           --name $(grafana_instance_name) \
           --resource-group $(resource_group_name) \
@@ -81,13 +85,25 @@ stages:
           --sku Standard \
           --identity-type SystemAssigned
 
-        # Set up Diagnostic Settings for AKS
+        # Set up Diagnostic Settings for AKS (Check if already exists)
         echo "Configuring Diagnostic Settings for AKS..."
-        az monitor diagnostic-settings create \
-          --name "aks-diagnostics" \
-          --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
-          --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --metrics '[{"category": "AllMetrics", "enabled": true}]'
+        az monitor diagnostic-settings list \
+          --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" | grep 'goreg4-diagnostics'
+
+        if [ $? -eq 0 ]; then
+          echo "Diagnostic settings already exist, updating..."
+          az monitor diagnostic-settings update \
+            --name "goreg4-diagnostics" \
+            --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+            --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+            --metrics '[{"category": "AllMetrics", "enabled": true}]'
+        else
+          echo "No existing diagnostic settings, creating new ones..."
+          az monitor diagnostic-settings create \
+            --name "goreg4-diagnostics" \
+            --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+            --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+            --metrics '[{"category": "AllMetrics", "enabled": true}]'
 
         echo "All monitoring services have been activated successfully."
       displayName: 'Activate Monitoring Services'
