@@ -48,43 +48,45 @@ stages:
 #         ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
 
 - stage: EnableMonitoring
-  displayName: 'Enable Prometheus and Grafana Monitoring'
+  displayName: 'Enable Container Logs, Prometheus, and Grafana'
   jobs:
   - job: SetupMonitoring
-    displayName: 'Activate Prometheus and Grafana'
+    displayName: 'Activate Monitoring Services'
     steps:
     - script: |
         # Login to Azure
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
-        # Enable Prometheus in the Log Analytics Workspace
-        az monitor log-analytics workspace pack enable \
-          --resource-group $(resource_group_name) \
-          --workspace-name $(log_analytics_workspace_name) \
-          --pack-name Prometheus
-
-        # Enable Container Insights for AKS
+        # Enable Container Logs in the Log Analytics Workspace
+        echo "Enabling Container Logs..."
         az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
           --workspace-name $(log_analytics_workspace_name) \
           --pack-name ContainerInsights
 
-        # Set up diagnostic settings for AKS
+        # Enable Managed Prometheus Metrics in Azure Monitor Workspace
+        echo "Enabling Prometheus metrics..."
+        az monitor metrics workspace enable \
+          --resource-group $(resource_group_name) \
+          --workspace-name $(azure_monitor_workspace_name)
+
+        # Deploy Managed Grafana instance
+        echo "Setting up Managed Grafana instance..."
+        az monitor managed-grafana create \
+          --resource-group $(resource_group_name) \
+          --workspace-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
+          --name $(grafana_instance_name) \
+          --location $(azure_region) \
+          --sku Standard
+
+        # Set up Diagnostic Settings for AKS to enable monitoring
+        echo "Configuring Diagnostic Settings for AKS..."
         az monitor diagnostic-settings create \
-          --name "$(diagnostic_setting_name)" \
+          --name "aks-diagnostics" \
           --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
           --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
           --metrics '[{"category": "AllMetrics", "enabled": true}, {"category": "Network", "enabled": true}]'
 
-        # Deploy Managed Grafana
-        az monitor managed-grafana create \
-          --resource-group $(resource_group_name) \
-          --workspace-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-          --name "$(grafana_instance_name)" \
-          --location "$(azure_region)" \
-          --sku "Standard"
-
-        # Confirm Prometheus and Grafana activation
-        echo "Prometheus and Grafana have been successfully activated."
-      displayName: 'Activate Prometheus and Grafana Monitoring'
+        echo "All monitoring services have been enabled successfully."
+      displayName: 'Activate Monitoring Services'
