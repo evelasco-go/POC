@@ -75,8 +75,7 @@ stages:
 
         # Install Grafana extension if not installed
         echo "Installing Grafana extension..."
-        az config set extension.dynamic_install_allow_preview=true
-        az extension add --name grafana --upgrade
+        az extension add --name grafana
 
         # Deploy Managed Grafana instance
         echo "Setting up Managed Grafana instance..."
@@ -85,7 +84,7 @@ stages:
           --resource-group $(resource_group_name) \
           --location $(azure_region) \
           --sku Standard \
-          --identity SystemAssigned
+          --identity type=SystemAssigned
 
         # Set up Diagnostic Settings for AKS (Check if already exists)
         echo "Configuring Diagnostic Settings for AKS..."
