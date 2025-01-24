@@ -15,7 +15,7 @@ variables:
   diagnostic_setting_name: "goreg4-diagnostics"
   grafana_instance_name: "goreg4-grafana"
   azure_region: "East US"
-  azure_monitor_workspace_name: "defaultazuremonitorworkspace-eus"  # Add this line for Prometheus workspace
+  azure_monitor_workspace_name: "defaultazuremonitorworkspace-eus" # Managed Prometheus workspace name
 
 stages:
 # Terraform Stage (Commented Out)
@@ -68,13 +68,15 @@ stages:
 
         # Enable Prometheus Metrics in Azure Monitor Workspace
         echo "Enabling Prometheus metrics..."
-        az monitor metrics workspace enable \
+        az monitor log-analytics workspace enable \
           --resource-group $(resource_group_name) \
-          --workspace-name $(azure_monitor_workspace_name)
+          --workspace-name $(azure_monitor_workspace_name) \
+          --name Prometheus
 
         # Install Grafana extension if not installed
         echo "Installing Grafana extension..."
-        az extension add --name grafana
+        az config set extension.dynamic_install_allow_preview=true
+        az extension add --name grafana --upgrade
 
         # Deploy Managed Grafana instance
         echo "Setting up Managed Grafana instance..."
@@ -83,7 +85,7 @@ stages:
           --resource-group $(resource_group_name) \
           --location $(azure_region) \
           --sku Standard \
-          --identity-type SystemAssigned
+          --identity SystemAssigned
 
         # Set up Diagnostic Settings for AKS (Check if already exists)
         echo "Configuring Diagnostic Settings for AKS..."
@@ -96,14 +98,16 @@ stages:
             --name "goreg4-diagnostics" \
             --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
             --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-            --metrics '[{"category": "AllMetrics", "enabled": true}]'
+            --metrics '[{"category": "AllMetrics", "enabled": true}]' \
+            --logs '[{"category": "kube-apiserver", "enabled": true}, {"category": "kube-controller-manager", "enabled": true}]'
         else
           echo "No existing diagnostic settings, creating new ones..."
           az monitor diagnostic-settings create \
             --name "goreg4-diagnostics" \
             --resource "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
             --workspace "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)" \
-            --metrics '[{"category": "AllMetrics", "enabled": true}]'
+            --metrics '[{"category": "AllMetrics", "enabled": true}]' \
+            --logs '[{"category": "kube-apiserver", "enabled": true}, {"category": "kube-controller-manager", "enabled": true}]'
         fi
 
         echo "All monitoring services have been activated successfully."
