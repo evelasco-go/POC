@@ -66,16 +66,20 @@ stages:
           --workspace-name $(log_analytics_workspace_name) \
           --name ContainerInsights
 
-        # Enable Prometheus Metrics in Azure Monitor Workspace (Ensure Prometheus is available)
+        # Enable Prometheus metrics in Azure Monitor Workspace (Skip if unavailable)
         echo "Enabling Prometheus metrics..."
-        az monitor log-analytics workspace pack enable \
+        if az monitor log-analytics workspace pack enable \
           --resource-group $(resource_group_name) \
           --workspace-name $(log_analytics_workspace_name) \
-          --name Prometheus || echo "Prometheus pack not available"
+          --name Prometheus; then
+          echo "Prometheus enabled successfully."
+        else
+          echo "Prometheus pack not available."
+        fi
 
         # Install Grafana extension if not installed
         echo "Installing Grafana extension..."
-        az extension add --name grafana || az extension update --name grafana
+        az extension add --name grafana || echo "Grafana extension already installed"
 
         # Deploy Managed Grafana instance
         echo "Setting up Managed Grafana instance..."
@@ -83,8 +87,7 @@ stages:
           --name $(grafana_instance_name) \
           --resource-group $(resource_group_name) \
           --location $(azure_region) \
-          --sku Standard \
-          --enable-managed-identity
+          --sku Standard
 
         # Set up Diagnostic Settings for AKS
         echo "Configuring Diagnostic Settings for AKS..."
