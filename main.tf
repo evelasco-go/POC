@@ -85,12 +85,11 @@ resource "helm_release" "grafana" {
   chart      = "grafana"
   version    = "6.19.3"
   values = [
-    {
-      adminPassword = "yourpassword"
-      service = {
-        type = "LoadBalancer"
-      }
-    }
+    <<EOF
+adminPassword: yourpassword
+service:
+  type: LoadBalancer
+EOF
   ]
   wait       = true
 }
