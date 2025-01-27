@@ -7,6 +7,11 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# Kubernetes Provider Configuration
+provider "kubernetes" {
+  config_path = "${path.module}/kubeconfig"
+}
+
 # Resource Group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
@@ -22,16 +27,16 @@ resource "azurerm_storage_account" "example" {
   account_replication_type = "LRS"
 }
 
-# Storage Container
+# Storage Container Resource
 resource "azurerm_storage_container" "example" {
   name                  = var.container_name
   storage_account_name  = azurerm_storage_account.example.name
   container_access_type = "private"
 }
 
-# Virtual Network
+# Virtual Network for AKS (Imported Resource)
 resource "azurerm_virtual_network" "example" {
-  name                = "${var.resource_group_name}-vnet"
+  name                = "Goreg4-vnet" # Match the existing VNet name
   location            = azurerm_resource_group.example.location
   resource_group_name = azurerm_resource_group.example.name
   address_space       = ["10.0.0.0/16"]
@@ -45,7 +50,7 @@ resource "azurerm_subnet" "example" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# AKS Cluster
+# Azure Kubernetes Service (AKS) Cluster
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = azurerm_resource_group.example.location
@@ -66,7 +71,7 @@ resource "azurerm_kubernetes_cluster" "example" {
   dns_prefix = "${var.aks_name}-dns"
 }
 
-# Role Assignment for AKS
+# Role Assignment for AKS System-Assigned Identity
 resource "azurerm_role_assignment" "example" {
   principal_id         = azurerm_kubernetes_cluster.example.kubelet_identity[0].object_id
   role_definition_name = "Contributor"
@@ -81,7 +86,7 @@ resource "azurerm_log_analytics_workspace" "example" {
   sku                 = var.log_analytics_sku
 }
 
-# Diagnostic Settings for AKS
+# Diagnostic Setting for AKS
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name               = var.diagnostic_setting_name
   target_resource_id = azurerm_kubernetes_cluster.example.id
@@ -94,11 +99,11 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
 
-# Fetch AKS Credentials
+# Fetch AKS credentials
 resource "null_resource" "get_aks_credentials" {
   provisioner "local-exec" {
     command = <<EOT
-      az aks get-credentials --resource-group ${var.resource_group_name} --name ${var.aks_name} --admin --overwrite-existing
+      az aks get-credentials --resource-group ${var.resource_group_name} --name ${var.aks_name} --admin --file kubeconfig
     EOT
   }
 
@@ -107,7 +112,7 @@ resource "null_resource" "get_aks_credentials" {
   }
 }
 
-# Helm Release for Prometheus
+# Helm Chart Installation (Prometheus)
 resource "helm_release" "prometheus" {
   depends_on = [null_resource.get_aks_credentials]
 
@@ -119,7 +124,7 @@ resource "helm_release" "prometheus" {
   wait       = true
 }
 
-# Helm Release for Grafana
+# Helm Chart Installation (Grafana)
 resource "helm_release" "grafana" {
   depends_on = [null_resource.get_aks_credentials]
 
@@ -138,11 +143,11 @@ EOF
   wait       = true
 }
 
-# Output Values
+# Outputs
 output "aks_cluster_name" {
   value = azurerm_kubernetes_cluster.example.name
 }
 
 output "grafana_url" {
-  value = "Grafana installed at LoadBalancer. Check the external IP in your Kubernetes cluster."
+  value = helm_release.grafana.name
 }
