@@ -12,6 +12,7 @@ variables:
   resource_group_name: "Goreg4"
   storage_account_name: "goreg4"
   container_name: "goreg4container"
+  aks_name: "goreg4-aks"
   terraformVersion: '1.3.5'
 
 stages:
