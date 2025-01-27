@@ -44,10 +44,7 @@ resource "azurerm_kubernetes_cluster" "example" {
     type = "SystemAssigned"
   }
 
-  dns_prefix = "${var.aks_name}-dns"  # DNS prefix added here
-
-  # Optionally, for private clusters use dns_prefix_private_cluster
-  # dns_prefix_private_cluster = "${var.aks_name}-private-dns"
+  dns_prefix = "${var.aks_name}-dns"
 }
 
 # Log Analytics Workspace
@@ -62,14 +59,28 @@ resource "azurerm_log_analytics_workspace" "example" {
 resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   name               = var.diagnostic_setting_name
   target_resource_id = azurerm_kubernetes_cluster.example.id
-  log_analytics {
-    workspace_id = azurerm_log_analytics_workspace.example.id
-  }
 
-  metrics {
+  #log {
+  #  category = "KubeApiserver"
+  #  enabled  = true
+  #}
+
+  #log {
+  #  category = "KubeControllerManager"
+  #  enabled  = true
+  #}
+
+  #log {
+  #  category = "KubeScheduler"
+  #  enabled  = true
+  #}
+
+  metric {
     category = "AllMetrics"
     enabled  = true
   }
+
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
 
 # Helm Chart Installation (Prometheus & Grafana)
