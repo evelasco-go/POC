@@ -32,7 +32,8 @@ provider "helm" {
   kubernetes {
     host                   = azurerm_kubernetes_cluster.example.kube_config[0].host
     cluster_ca_certificate = azurerm_kubernetes_cluster.example.kube_config[0].cluster_ca_certificate
-    token                  = azurerm_kubernetes_cluster.example.kube_config[0].token
+    client_certificate     = azurerm_kubernetes_cluster.example.kube_config[0].client_certificate
+    client_key             = azurerm_kubernetes_cluster.example.kube_config[0].client_key
   }
 }
 
