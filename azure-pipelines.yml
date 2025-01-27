@@ -9,15 +9,9 @@ variables:
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  resource_group_name: "POCresourcepcpcpcpoc"
-  storage_account_name: "pocstoragepcpcpoc"
-  container_name: "tfstate"
-  aks_name: "POCAKSClusterpcpcpcpoc"
-  node_count: 2
-  location: "East US"
-  log_analytics_workspace_name: "pocanalyticspcpcpcpoc"
-  log_analytics_sku: "PerGB2018"
-  diagnostic_setting_name: "pocdiagnosticpocpcpcpcpoc"
+  resource_group_name: "Goreg4"
+  storage_account_name: "goreg4"
+  container_name: "goreg4container"
   terraformVersion: '1.3.5'
 
 stages:
@@ -51,53 +45,21 @@ stages:
         }
 
         RESOURCE_GROUP_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
-        AKS_CLUSTER_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         STORAGE_ACCOUNT_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-        STORAGE_CONTAINER_ID="https://$(storage_account_name).blob.core.windows.net/$(container_name)"
-        LOG_ANALYTICS_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
-        DIAGNOSTIC_SETTING_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
 
-        # Import resources if they exist, else apply them
+        # Import or Create Resource Group
         if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
           terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
         else
           terraform apply -auto-approve -target=azurerm_resource_group.example
         fi
 
-        if [[ "$(check_resource_exists $AKS_CLUSTER_ID)" == "true" ]]; then
-          terraform import azurerm_kubernetes_cluster.example "$AKS_CLUSTER_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_kubernetes_cluster.example
-        fi
-
+        # Import or Create Storage Account
         if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" ]]; then
           terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
         else
           terraform apply -auto-approve -target=azurerm_storage_account.example
         fi
-
-        if [[ "$(check_resource_exists $STORAGE_CONTAINER_ID)" == "true" ]]; then
-          terraform import azurerm_storage_container.example "$STORAGE_CONTAINER_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_storage_container.example
-        fi
-
-        if [[ "$(check_resource_exists $LOG_ANALYTICS_ID)" == "true" ]]; then
-          terraform import azurerm_log_analytics_workspace.example "$LOG_ANALYTICS_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_log_analytics_workspace.example
-        fi
-
-        EXISTING_DIAGNOSTIC_SETTING=$(az monitor diagnostic-settings list --resource $(AKS_CLUSTER_ID) --query "[?name=='$(diagnostic_setting_name)'].name" -o tsv)
-        if [[ -z "$EXISTING_DIAGNOSTIC_SETTING" ]]; then
-          terraform apply -auto-approve -target=azurerm_monitor_diagnostic_setting.aks_metrics
-        else
-          echo "Diagnostic setting '$(diagnostic_setting_name)' already exists, skipping creation."
-        fi
-
-        # Now run terraform plan and apply for the remaining resources
-        terraform plan -out=tfplan
-        terraform apply -auto-approve
       displayName: 'Import or Create Resources Dynamically'
 
     - script: |
