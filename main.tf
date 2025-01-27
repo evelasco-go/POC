@@ -106,6 +106,15 @@ resource "null_resource" "get_aks_credentials" {
   }
 }
 
+default_node_pool {
+  name                       = "default"
+  temporary_name_for_rotation = "default-rotated" # Temporary name for rotation
+  node_count                 = var.node_count
+  vm_size                    = "Standard_DS2_v2"
+  vnet_subnet_id             = azurerm_subnet.example.id
+}
+
+
 # Helm Chart Installation (Prometheus & Grafana)
 resource "helm_release" "prometheus" {
   depends_on = [null_resource.get_aks_credentials]
