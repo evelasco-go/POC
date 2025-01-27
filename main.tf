@@ -43,10 +43,10 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
     category = "AllMetrics"
     enabled  = true
   }
-  log_analytics {
-    category = "KubeInventory"
-    enabled  = true
-  }
+  #log_analytics {
+  #  category = "KubeInventory"
+  #  enabled  = true
+  #}
 }
 
 resource "azurerm_kubernetes_cluster" "example" {
