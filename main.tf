@@ -78,7 +78,34 @@ resource "helm_release" "prometheus" {
   wait       = true
 }
 
+# Fetch AKS credentials
+resource "null_resource" "get_aks_credentials" {
+  provisioner "local-exec" {
+    command = <<EOT
+      az aks get-credentials --resource-group ${var.resource_group_name} --name ${var.aks_name}
+    EOT
+  }
+
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+}
+
+# Helm Chart Installation (Prometheus & Grafana)
+resource "helm_release" "prometheus" {
+  depends_on = [null_resource.get_aks_credentials]
+
+  name       = "prometheus"
+  namespace  = "monitoring"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  version    = "15.1.0"
+  wait       = true
+}
+
 resource "helm_release" "grafana" {
+  depends_on = [null_resource.get_aks_credentials]
+
   name       = "grafana"
   namespace  = "monitoring"
   repository = "https://grafana.github.io/helm-charts"
@@ -93,4 +120,5 @@ EOF
   ]
   wait       = true
 }
+
 
