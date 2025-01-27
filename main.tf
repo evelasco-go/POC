@@ -84,9 +84,13 @@ resource "helm_release" "grafana" {
   repository = "https://grafana.github.io/helm-charts"
   chart      = "grafana"
   version    = "6.19.3"
-  values     = [
-    "adminPassword=yourpassword",
-    "service.type=LoadBalancer"
+  values = [
+    {
+      adminPassword = "yourpassword"
+      service = {
+        type = "LoadBalancer"
+      }
+    }
   ]
   wait       = true
 }
