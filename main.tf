@@ -43,6 +43,11 @@ resource "azurerm_kubernetes_cluster" "example" {
   identity {
     type = "SystemAssigned"
   }
+
+  dns_prefix = "${var.aks_name}-dns"  # DNS prefix added here
+
+  # Optionally, for private clusters use dns_prefix_private_cluster
+  # dns_prefix_private_cluster = "${var.aks_name}-private-dns"
 }
 
 # Log Analytics Workspace
