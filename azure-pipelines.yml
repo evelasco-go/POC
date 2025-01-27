@@ -19,7 +19,6 @@ variables:
   log_analytics_sku: "PerGB2018"
   diagnostic_setting_name: "pocdiagnosticpocpcpcpcpoc"
   terraformVersion: '1.3.5'
-  
 
 stages:
 - stage: Terraform
