@@ -1,62 +1,9 @@
 provider "azurerm" {
   features {}
-  client_id       = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
-  client_secret   = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
-  tenant_id       = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  subscription_id = "15e60859-88d7-4c84-943f-55488479910c"
-}
-
-# Define variables
-variable "azure_subscription_id" {
-  default = "15e60859-88d7-4c84-943f-55488479910c"
-}
-
-variable "azure_client_id" {
-  default = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
-}
-
-variable "azure_client_secret" {
-  default = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
-}
-
-variable "azure_tenant_id" {
-  default = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-}
-
-variable "resource_group_name" {
-  default = "Goreg4"
-}
-
-variable "storage_account_name" {
-  default = "goreg4"
-}
-
-variable "container_name" {
-  default = "goreg4container"
-}
-
-variable "aks_name" {
-  default = "goreg4-aks"
-}
-
-variable "log_analytics_workspace_name" {
-  default = "goreg4-analytics"
-}
-
-variable "diagnostic_setting_name" {
-  default = "goreg4-diagnostics"
-}
-
-variable "location" {
-  default = "East US"
-}
-
-variable "log_analytics_sku" {
-  default = "PerGB2018"
-}
-
-variable "node_count" {
-  default = 2
+  client_id       = var.azure_client_id
+  client_secret   = var.azure_client_secret
+  tenant_id       = var.azure_tenant_id
+  subscription_id = var.azure_subscription_id
 }
 
 # Resource group
@@ -95,13 +42,6 @@ resource "azurerm_kubernetes_cluster" "example" {
 
   identity {
     type = "SystemAssigned"
-  }
-}
-
-# Kubernetes Namespace (Monitoring)
-resource "kubernetes_namespace" "monitoring" {
-  metadata {
-    name = "monitoring"
   }
 }
 
@@ -148,28 +88,4 @@ resource "helm_release" "grafana" {
     "service.type=LoadBalancer"
   ]
   wait       = true
-}
-
-# Kubernetes ConfigMap (for monitoring)
-resource "kubernetes_config_map" "prometheus_config" {
-  metadata {
-    name      = "prometheus-config"
-    namespace = kubernetes_namespace.monitoring.metadata[0].name
-  }
-
-  data = {
-    "prometheus.yml" = <<YAML
-# Configuration for Prometheus server
-global:
-  scrape_interval: 15s
-scrape_configs:
-  - job_name: 'kubernetes-pods'
-    kubernetes_sd_configs:
-      - role: pod
-    relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_label_app]
-        action: keep
-        regex: prometheus
-YAML
-  }
 }
