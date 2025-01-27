@@ -54,7 +54,7 @@ stages:
         RESOURCE_GROUP_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
         AKS_CLUSTER_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)"
         STORAGE_ACCOUNT_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-       STORAGE_CONTAINER_ID="https://$(storage_account_name).blob.core.windows.net/$(container_name)"
+        STORAGE_CONTAINER_ID="https://$(storage_account_name).blob.core.windows.net/$(container_name)"
         LOG_ANALYTICS_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(log_analytics_workspace_name)"
         DIAGNOSTIC_SETTING_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)|$(diagnostic_setting_name)"
 
