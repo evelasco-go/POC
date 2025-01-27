@@ -47,6 +47,10 @@ stages:
 
         RESOURCE_GROUP_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
         STORAGE_ACCOUNT_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
+        terraform import azurerm_storage_container.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Storage/storageAccounts/goreg4/containers/goreg4container
+        terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.ContainerService/managedClusters/goreg4-aks
+        terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.OperationalInsights/workspaces/goreg4-analytics
+
 
         # Import or Create Resource Group
         if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
