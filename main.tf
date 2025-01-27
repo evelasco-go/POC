@@ -68,16 +68,6 @@ resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 }
 
-# Helm Chart Installation (Prometheus & Grafana)
-resource "helm_release" "prometheus" {
-  name       = "prometheus"
-  namespace  = "monitoring"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
-  version    = "15.1.0"
-  wait       = true
-}
-
 # Fetch AKS credentials
 resource "null_resource" "get_aks_credentials" {
   provisioner "local-exec" {
