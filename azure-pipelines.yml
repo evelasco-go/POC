@@ -52,6 +52,7 @@ stages:
         terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.OperationalInsights/workspaces/goreg4-analytics
         terraform import azurerm_storage_container.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Storage/storageAccounts/goreg4/blobServices/default/containers/goreg4container"
         terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.ContainerService/managedClusters/goreg4-aks|goreg4-diagnostics"
+        terraform import azurerm_virtual_network.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet
 
 
         # Import or Create Resource Group
