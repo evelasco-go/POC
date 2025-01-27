@@ -2,11 +2,15 @@ terraform {
   required_providers {
     azurerm = {
       source = "hashicorp/azurerm"
-      version = "~> 3.0"  # Specify a version here
+      version = "~> 3.0"
     }
     random = {
       source = "hashicorp/random"
-      version = "~> 3.0"  # Specify a version here
+      version = "~> 3.0"
+    }
+    helm = {
+      source = "hashicorp/helm"
+      version = "~> 2.0"
     }
   }
 }
@@ -22,6 +26,15 @@ provider "azurerm" {
 
 # Provider configuration for random ID generation
 provider "random" {}
+
+# Provider configuration for Helm
+provider "helm" {
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.example.kube_config[0].host
+    cluster_ca_certificate = azurerm_kubernetes_cluster.example.kube_config[0].cluster_ca_certificate
+    token                  = azurerm_kubernetes_cluster.example.kube_config[0].token
+  }
+}
 
 # Define variables
 variable "azure_subscription_id" {}
@@ -68,7 +81,6 @@ output "kubeconfig" {
   sensitive = true
 }
 
-
 # Azure Storage Account
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
@@ -87,7 +99,6 @@ resource "azurerm_storage_container" "example" {
     prevent_destroy = true
   }
 }
-
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
@@ -108,4 +119,44 @@ resource "azurerm_monitor_diagnostic_setting" "example" {
   }
 
   log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+}
+
+# Create namespace for monitoring (optional)
+resource "kubernetes_namespace" "monitoring" {
+  metadata {
+    name = "monitoring"
+  }
+}
+
+# Install Prometheus and Grafana using Helm (with kube-prometheus-stack)
+resource "helm_release" "prometheus" {
+  name       = "prometheus"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  version    = "45.3.0"
+
+  set {
+    name  = "prometheus.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "grafana.enabled"
+    value = "true"
+  }
+}
+
+# Optionally, install Grafana separately (this is redundant if using the kube-prometheus-stack chart)
+resource "helm_release" "grafana" {
+  name       = "grafana"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  repository = "https://grafana.github.io/helm-charts"
+  chart      = "grafana"
+  version    = "6.10.1"
+
+  set {
+    name  = "adminPassword"
+    value = "admin"
+  }
 }
