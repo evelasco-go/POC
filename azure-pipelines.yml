@@ -92,6 +92,8 @@ stages:
         az account set --subscription $(azure_subscription_id)
 
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+        export KUBECONFIG=$(Build.SourcesDirectory)/.kube/config
+
 
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
