@@ -8,7 +8,7 @@ provider "azurerm" {
 }
 
 provider "kubernetes" {
-  config_path = "kubeconfig" # Path to kubeconfig file for your AKS cluster
+   config_path = var.kubeconfig_path
 }
 
 # Helm Chart Installation - Prometheus
