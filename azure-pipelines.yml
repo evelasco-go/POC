@@ -33,21 +33,25 @@ stages:
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
+        # Get AKS credentials
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
+        # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
+        # Add Helm chart repositories
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
 
+        # Install Prometheus and Grafana using Helm
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
         helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
 
+        # Verify the deployments
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
       env:
         KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
 
-# The Terraform stage has no dependency on this new stage
-# You can leave the Terraform stage as it is, if necessary.
+# Add other stages here (e.g., Terraform) as needed
