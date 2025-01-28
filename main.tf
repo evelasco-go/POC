@@ -54,22 +54,28 @@ resource "azurerm_kubernetes_cluster" "example" {
   dns_prefix = "${var.aks_name}-dns"
 }
 
-# Virtual Network (Existing Resource)
-resource "azurerm_virtual_network" "example" {
-  name                = "Goreg4-vnet"                          # Existing VNet Name
-  location            = "eastus"                               # VNet Location
-  resource_group_name = "Goreg4"                               # Resource Group Name
-  address_space       = ["10.0.0.0/16"]                        # Existing Address Space (update as per your configuration)
+# Log Analytics Workspace (for Monitoring/Insights)
+resource "azurerm_log_analytics_workspace" "example" {
+  name                = "goreg4-analytics"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+  sku                 = "PerGB2018"
 }
 
-# Subnet (Existing Resource)
+# Virtual Network and Subnet (Existing Resources)
+resource "azurerm_virtual_network" "example" {
+  name                = "Goreg4-vnet"
+  location            = "eastus"
+  resource_group_name = "Goreg4"
+  address_space       = ["10.0.0.0/16"]
+}
+
 resource "azurerm_subnet" "example" {
-  name                 = "Goreg4-subnet"                       # Existing Subnet Name
+  name                 = "Goreg4-subnet"
   resource_group_name  = azurerm_virtual_network.example.resource_group_name
   virtual_network_name = azurerm_virtual_network.example.name
-  address_prefixes     = ["10.0.1.0/24"]                       # Existing Address Prefix (update as per your configuration)
+  address_prefixes     = ["10.0.1.0/24"]
 }
-
 
 # Fetch AKS Credentials
 resource "null_resource" "get_aks_credentials" {
