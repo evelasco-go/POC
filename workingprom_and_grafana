@@ -1,0 +1,53 @@
+trigger:
+  - dev
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
+  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
+  terraformVersion: '1.3.5'
+  node_count: 2
+  location: "East US"
+  log_analytics_sku: "PerGB2018"
+
+  resource_group_name: "Goreg4"
+  storage_account_name: "goreg4"
+  container_name: "goreg4container"
+  aks_name: "goreg4-aks"
+  log_analytics_workspace_name: "goreg4-analytics"
+  diagnostic_setting_name: "goreg4-diagnostics"
+
+stages:
+# Add a new stage for Prometheus and Grafana deployment without dependencies
+- stage: DeployMonitoringStandalone
+  displayName: 'Deploy Prometheus and Grafana without dependencies'
+  jobs:
+  - job: HelmDeployment
+    displayName: 'Deploy Prometheus and Grafana via Helm'
+    steps:
+    - script: |
+        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+        az account set --subscription $(azure_subscription_id)
+
+        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+
+        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo update
+
+        helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
+        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
+
+        kubectl get pods -n monitoring
+      displayName: 'Install Prometheus and Grafana via Helm'
+      env:
+        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
+
+# The Terraform stage has no dependency on this new stage
+# You can leave the Terraform stage as it is, if necessary.
