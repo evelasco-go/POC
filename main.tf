@@ -34,16 +34,6 @@ resource "azurerm_storage_container" "example" {
   container_access_type = "private"
 }
 
-# Virtual Network (Imported Resource)
-resource "azurerm_virtual_network" "example" {
-  # Replace with imported resource information
-}
-
-# Subnet (Imported Resource)
-resource "azurerm_subnet" "example" {
-  # Replace with imported resource information
-}
-
 # Azure Kubernetes Service (AKS) Cluster
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
