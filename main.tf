@@ -51,15 +51,6 @@ resource "azurerm_monitor_diagnostic_setting" "example" {
   target_resource_id         = azurerm_kubernetes_cluster.example.id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 
-  logs {
-    category = "KubeCluster"
-    enabled  = true
-    retention_policy {
-      days    = 30
-      enabled = true
-    }
-  }
-
   metrics {
     category = "AllMetrics"
     enabled  = true
