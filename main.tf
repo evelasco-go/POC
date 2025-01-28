@@ -67,9 +67,17 @@ resource "helm_release" "prometheus" {
 
   name       = "prometheus"
   namespace  = "monitoring"
+  create_namespace = true
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
   version    = "15.1.0"
+  values = [
+    <<EOF
+prometheus:
+  service:
+    type: LoadBalancer
+EOF
+  ]
   wait       = true
 }
 
