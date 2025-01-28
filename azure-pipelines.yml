@@ -36,50 +36,6 @@ stages:
       displayName: 'Terraform Init'
 
     - script: |
-        check_resource_exists() {
-          local resource_id="$1"
-          if az resource show --ids "$resource_id" >/dev/null 2>&1; then
-            echo "true"
-          else
-            echo "false"
-          fi
-        }
-
-        RESOURCE_GROUP_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)"
-        STORAGE_ACCOUNT_ID="/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Storage/storageAccounts/$(storage_account_name)"
-        terraform import azurerm_storage_container.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Storage/storageAccounts/goreg4/containers/goreg4container
-        terraform import azurerm_kubernetes_cluster.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.ContainerService/managedClusters/goreg4-aks
-        terraform import azurerm_log_analytics_workspace.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.OperationalInsights/workspaces/goreg4-analytics
-        terraform import azurerm_storage_container.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Storage/storageAccounts/goreg4/blobServices/default/containers/goreg4container"
-        terraform import azurerm_monitor_diagnostic_setting.aks_metrics "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.ContainerService/managedClusters/goreg4-aks|goreg4-diagnostics"
-        terraform import azurerm_virtual_network.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet
-        terraform import azurerm_virtual_network.example "/subscriptions/<subscription_id>/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet"
-        terraform import azurerm_subnet.example "/subscriptions/<subscription_id>/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet/subnets/Goreg4-subnet"
-        terraform import azurerm_subnet.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet/subnets/Goreg4-subnet"
-
-
-
-
-        # Import or Create Resource Group
-        if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
-          terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_resource_group.example
-        fi
-
-        # Import or Create Storage Account
-        if [[ "$(check_resource_exists $STORAGE_ACCOUNT_ID)" == "true" ]]; then
-          terraform import azurerm_storage_account.example "$STORAGE_ACCOUNT_ID"
-        else
-          terraform apply -auto-approve -target=azurerm_storage_account.example
-        fi
-      displayName: 'Import or Create Resources Dynamically'
-
-    - script: |
-        terraform plan -out=tfplan
-      displayName: 'Terraform Plan'
-    
-    - script: |
         terraform apply -auto-approve
       displayName: 'Terraform Apply'
       env:
@@ -98,14 +54,9 @@ stages:
     - script: |
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
-
-        - script: |
-          az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-          export KUBECONFIG=$HOME/.kube/config
-        displayName: 'Get AKS Credentials'
-
-
-
+        
+        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+        export KUBECONFIG=$HOME/.kube/config
 
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
