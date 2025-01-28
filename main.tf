@@ -8,8 +8,12 @@ provider "azurerm" {
 }
 
 provider "kubernetes" {
-   config_path = var.kubeconfig_path
+  host                   = azurerm_kubernetes_cluster.example.kube_admin_config.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.example.kube_admin_config.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.example.kube_admin_config.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.example.kube_admin_config.cluster_ca_certificate)
 }
+
 
 # Helm Chart Installation - Prometheus
 resource "helm_release" "prometheus" {
