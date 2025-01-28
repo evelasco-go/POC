@@ -8,10 +8,7 @@ provider "azurerm" {
 }
 
 provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.example.kube_admin_config.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.example.kube_admin_config.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.example.kube_admin_config.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.example.kube_admin_config.cluster_ca_certificate)
+  export KUBE_CONFIG_PATH=/path/to/kubeconfig
 }
 
 
