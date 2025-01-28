@@ -9,7 +9,7 @@ provider "azurerm" {
 
 # Kubernetes Provider Configuration
 provider "kubernetes" {
-  config_path = "${path.module}/kubeconfig"
+  config_path = "kubeconfig"
 }
 
 # Resource Group
