@@ -12,29 +12,21 @@ provider "kubernetes" {
   config_path = "kubeconfig"
 }
 
-# Resource Group
+# Resource Group (must exist before other resources)
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
   location = var.location
 }
 
-# Azure Storage Account
-resource "azurerm_storage_account" "example" {
-  name                     = var.storage_account_name
-  resource_group_name      = azurerm_resource_group.example.name
-  location                 = var.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+# Log Analytics Workspace (for Insights)
+resource "azurerm_log_analytics_workspace" "example" {
+  name                = "goreg4-analytics"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+  sku                 = "PerGB2018"
 }
 
-# Storage Container Resource
-resource "azurerm_storage_container" "example" {
-  name                 = var.container_name
-  storage_account_id   = azurerm_storage_account.example.id
-  container_access_type = "private"
-}
-
-# Azure Kubernetes Service (AKS) Cluster
+# AKS Cluster (basic, without extra networking resources)
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = azurerm_resource_group.example.location
@@ -44,7 +36,6 @@ resource "azurerm_kubernetes_cluster" "example" {
     name            = "default"
     node_count      = var.node_count
     vm_size         = "Standard_DS2_v2"
-    vnet_subnet_id  = azurerm_subnet.example.id
   }
 
   identity {
@@ -54,45 +45,34 @@ resource "azurerm_kubernetes_cluster" "example" {
   dns_prefix = "${var.aks_name}-dns"
 }
 
-# Log Analytics Workspace (for Monitoring/Insights)
-resource "azurerm_log_analytics_workspace" "example" {
-  name                = "goreg4-analytics"
-  location            = azurerm_resource_group.example.location
-  resource_group_name = azurerm_resource_group.example.name
-  sku                 = "PerGB2018"
-}
+# Enable Insights (Diagnostic Setting for AKS)
+resource "azurerm_monitor_diagnostic_setting" "example" {
+  name                       = "goreg4-aks-diagnostics"
+  target_resource_id         = azurerm_kubernetes_cluster.example.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
 
-# Virtual Network and Subnet (Existing Resources)
-resource "azurerm_virtual_network" "example" {
-  name                = "Goreg4-vnet"
-  location            = "eastus"
-  resource_group_name = "Goreg4"
-  address_space       = ["10.0.0.0/16"]
-}
-
-resource "azurerm_subnet" "example" {
-  name                 = "Goreg4-subnet"
-  resource_group_name  = azurerm_virtual_network.example.resource_group_name
-  virtual_network_name = azurerm_virtual_network.example.name
-  address_prefixes     = ["10.0.1.0/24"]
-}
-
-# Fetch AKS Credentials
-resource "null_resource" "get_aks_credentials" {
-  provisioner "local-exec" {
-    command = <<EOT
-      az aks get-credentials --resource-group ${azurerm_resource_group.example.name} --name ${var.aks_name} --file kubeconfig
-    EOT
+  logs {
+    category = "KubeCluster"
+    enabled  = true
+    retention_policy {
+      days    = 30
+      enabled = true
+    }
   }
 
-  triggers = {
-    always_run = "${timestamp()}"
+  metrics {
+    category = "AllMetrics"
+    enabled  = true
+    retention_policy {
+      days    = 30
+      enabled = true
+    }
   }
 }
 
 # Helm Chart Installation (Prometheus)
 resource "helm_release" "prometheus" {
-  depends_on = [null_resource.get_aks_credentials]
+  depends_on = [azurerm_kubernetes_cluster.example]
 
   name       = "prometheus"
   namespace  = "monitoring"
@@ -104,7 +84,7 @@ resource "helm_release" "prometheus" {
 
 # Helm Chart Installation (Grafana)
 resource "helm_release" "grafana" {
-  depends_on = [null_resource.get_aks_credentials]
+  depends_on = [azurerm_kubernetes_cluster.example]
 
   name       = "grafana"
   namespace  = "monitoring"
