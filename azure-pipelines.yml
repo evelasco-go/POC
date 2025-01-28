@@ -32,10 +32,10 @@ stages:
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
-        # Enable Managed Prometheus on AKS cluster
-        az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring --enable-managed-prometheus
-        
-        # Verify Managed Prometheus and Metrics Server status
+        # Enable Azure Monitor for containers (which includes Managed Prometheus)
+        az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+
+        # Check if Managed Prometheus is active
         kubectl get pods -n kube-system | grep metrics-server
         kubectl get pods -n monitoring
       displayName: 'Enable Managed Prometheus Metrics'
@@ -69,23 +69,5 @@ stages:
 
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
-      env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
-
-# Example Terraform Stage (Optional) - You can leave this if you need to continue Terraform configuration
-- stage: TerraformDeployment
-  displayName: 'Terraform AKS Deployment'
-  jobs:
-  - job: Terraform
-    displayName: 'Deploy Infrastructure using Terraform'
-    steps:
-    - script: |
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-        sudo apt-add-repository "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com stable main"
-        sudo apt-get update && sudo apt-get install terraform=$(terraformVersion)
-
-        terraform init
-        terraform apply -auto-approve
-      displayName: 'Initialize and Apply Terraform'
       env:
         KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
