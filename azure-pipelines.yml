@@ -55,6 +55,7 @@ stages:
         terraform import azurerm_virtual_network.example /subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet
         terraform import azurerm_virtual_network.example "/subscriptions/<subscription_id>/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet"
         terraform import azurerm_subnet.example "/subscriptions/<subscription_id>/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet/subnets/Goreg4-subnet"
+        terraform import azurerm_subnet.example "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet/subnets/Goreg4-subnet"
 
 
 
