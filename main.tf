@@ -29,25 +29,19 @@ resource "azurerm_storage_account" "example" {
 
 # Storage Container Resource
 resource "azurerm_storage_container" "example" {
-  name                  = var.container_name
-  storage_account_name  = azurerm_storage_account.example.name
+  name                 = var.container_name
+  storage_account_id   = azurerm_storage_account.example.id
   container_access_type = "private"
 }
 
-# Virtual Network for AKS (Imported Resource)
+# Virtual Network (Imported Resource)
 resource "azurerm_virtual_network" "example" {
-  name                = "Goreg4-vnet" # Match the existing VNet name
-  location            = azurerm_resource_group.example.location
-  resource_group_name = azurerm_resource_group.example.name
-  address_space       = ["10.0.0.0/16"]
+  # Replace with imported resource information
 }
 
-# Subnet for AKS
+# Subnet (Imported Resource)
 resource "azurerm_subnet" "example" {
-  name                 = "${var.resource_group_name}-subnet"
-  resource_group_name  = azurerm_resource_group.example.name
-  virtual_network_name = azurerm_virtual_network.example.name
-  address_prefixes     = ["10.0.1.0/24"]
+  # Replace with imported resource information
 }
 
 # Azure Kubernetes Service (AKS) Cluster
@@ -57,11 +51,10 @@ resource "azurerm_kubernetes_cluster" "example" {
   resource_group_name = azurerm_resource_group.example.name
 
   default_node_pool {
-    name                       = "default"
-    temporary_name_for_rotation = "default-rotated" # Temporary name for rotation
-    node_count                 = var.node_count
-    vm_size                    = "Standard_DS2_v2"
-    vnet_subnet_id             = azurerm_subnet.example.id
+    name            = "default"
+    node_count      = var.node_count
+    vm_size         = "Standard_DS2_v2"
+    vnet_subnet_id  = azurerm_subnet.example.id
   }
 
   identity {
@@ -71,44 +64,16 @@ resource "azurerm_kubernetes_cluster" "example" {
   dns_prefix = "${var.aks_name}-dns"
 }
 
-# Role Assignment for AKS System-Assigned Identity
-resource "azurerm_role_assignment" "example" {
-  principal_id         = azurerm_kubernetes_cluster.example.kubelet_identity[0].object_id
-  role_definition_name = "Contributor"
-  scope                = azurerm_resource_group.example.id
-}
-
-# Log Analytics Workspace
-resource "azurerm_log_analytics_workspace" "example" {
-  name                = var.log_analytics_workspace_name
-  location            = azurerm_resource_group.example.location
-  resource_group_name = azurerm_resource_group.example.name
-  sku                 = var.log_analytics_sku
-}
-
-# Diagnostic Setting for AKS
-resource "azurerm_monitor_diagnostic_setting" "aks_metrics" {
-  name               = var.diagnostic_setting_name
-  target_resource_id = azurerm_kubernetes_cluster.example.id
-
-  metric {
-    category = "AllMetrics"
-    enabled  = true
-  }
-
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
-}
-
-# Fetch AKS credentials
+# Fetch AKS Credentials
 resource "null_resource" "get_aks_credentials" {
   provisioner "local-exec" {
     command = <<EOT
-      az aks get-credentials --resource-group ${var.resource_group_name} --name ${var.aks_name} --admin --file kubeconfig
+      az aks get-credentials --resource-group ${azurerm_resource_group.example.name} --name ${var.aks_name} --file kubeconfig
     EOT
   }
 
   triggers = {
-    always_run = timestamp()
+    always_run = "${timestamp()}"
   }
 }
 
@@ -141,13 +106,4 @@ service:
 EOF
   ]
   wait       = true
-}
-
-# Outputs
-output "aks_cluster_name" {
-  value = azurerm_kubernetes_cluster.example.name
-}
-
-output "grafana_url" {
-  value = helm_release.grafana.name
 }
