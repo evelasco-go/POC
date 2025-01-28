@@ -13,7 +13,6 @@ variables:
   node_count: 2
   location: "East US"
   log_analytics_sku: "PerGB2018"
-
   resource_group_name: "Goreg4"
   storage_account_name: "goreg4"
   container_name: "goreg4container"
@@ -22,28 +21,28 @@ variables:
   diagnostic_setting_name: "goreg4-diagnostics"
 
 stages:
-# Add a new stage for Managed Prometheus activation and Prometheus/Grafana deployment
-- stage: ActivateManagedPrometheus
-  displayName: 'Activate Managed Prometheus'
+# Stage to enable Managed Prometheus in AKS
+- stage: EnablePrometheusMetrics
+  displayName: 'Enable Managed Prometheus Metrics'
   jobs:
-  - job: EnableManagedPrometheus
-    displayName: 'Enable Managed Prometheus on AKS'
+  - job: EnableMetrics
+    displayName: 'Activate Prometheus Metrics Collection'
     steps:
     - script: |
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
-        # Get AKS credentials
-        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-
-        # Enable Managed Prometheus on AKS
+        # Enable Managed Prometheus on AKS cluster
         az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring --enable-managed-prometheus
-        kubectl get pods -n kube-system
-      displayName: 'Enable Managed Prometheus on AKS'
+        
+        # Verify Managed Prometheus and Metrics Server status
+        kubectl get pods -n kube-system | grep metrics-server
+        kubectl get pods -n monitoring
+      displayName: 'Enable Managed Prometheus Metrics'
       env:
         KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
 
-# Add the Prometheus and Grafana deployment stage here as previously provided
+# Stage to deploy Prometheus and Grafana via Helm
 - stage: DeployMonitoringStandalone
   displayName: 'Deploy Prometheus and Grafana without dependencies'
   jobs:
@@ -54,25 +53,39 @@ stages:
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
 
-        # Get AKS credentials
         az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-        # Install Helm
         curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
-        # Add Helm chart repositories
         helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
         helm repo add grafana https://grafana.github.io/helm-charts
         helm repo update
 
-        # Install Prometheus and Grafana using Helm
+        # Install Prometheus via Helm
         helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
+        
+        # Install Grafana via Helm
         helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
 
-        # Verify the deployments
         kubectl get pods -n monitoring
       displayName: 'Install Prometheus and Grafana via Helm'
       env:
         KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
 
-# Add other stages here (e.g., Terraform) as needed
+# Example Terraform Stage (Optional) - You can leave this if you need to continue Terraform configuration
+- stage: TerraformDeployment
+  displayName: 'Terraform AKS Deployment'
+  jobs:
+  - job: Terraform
+    displayName: 'Deploy Infrastructure using Terraform'
+    steps:
+    - script: |
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+        sudo apt-add-repository "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com stable main"
+        sudo apt-get update && sudo apt-get install terraform=$(terraformVersion)
+
+        terraform init
+        terraform apply -auto-approve
+      displayName: 'Initialize and Apply Terraform'
+      env:
+        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
