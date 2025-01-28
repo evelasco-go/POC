@@ -57,6 +57,8 @@ stages:
         terraform import azurerm_subnet.example "/subscriptions/<subscription_id>/resourceGroups/Goreg4/providers/Microsoft.Network/virtualNetworks/Goreg4-vnet/subnets/Goreg4-subnet"
 
 
+
+
         # Import or Create Resource Group
         if [[ "$(check_resource_exists $RESOURCE_GROUP_ID)" == "true" ]]; then
           terraform import azurerm_resource_group.example "$RESOURCE_GROUP_ID"
