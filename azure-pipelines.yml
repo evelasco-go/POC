@@ -13,6 +13,7 @@ variables:
   node_count: 2
   location: "East US"
   log_analytics_sku: "PerGB2018"
+
   resource_group_name: "Goreg4"
   storage_account_name: "goreg4"
   container_name: "goreg4container"
@@ -21,53 +22,53 @@ variables:
   diagnostic_setting_name: "goreg4-diagnostics"
 
 stages:
-# Stage to enable Managed Prometheus in AKS
-- stage: EnablePrometheusMetrics
-  displayName: 'Enable Managed Prometheus Metrics'
-  jobs:
-  - job: EnableMetrics
-    displayName: 'Activate Prometheus Metrics Collection'
-    steps:
-    - script: |
-        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-        az account set --subscription $(azure_subscription_id)
+  - stage: DeployMonitoringStandalone
+    displayName: 'Deploy Prometheus and Grafana without dependencies'
+    jobs:
+      - job: HelmDeployment
+        displayName: 'Deploy Prometheus and Grafana via Helm'
+        steps:
+          - script: |
+              # Log in to Azure using the service principal
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-        # Enable Azure Monitor for containers (which includes Managed Prometheus)
-        az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+              # Get AKS credentials and configure kubectl
+              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-        # Check if Managed Prometheus is active
-        kubectl get pods -n kube-system | grep metrics-server
-        kubectl get pods -n monitoring
-      displayName: 'Enable Managed Prometheus Metrics'
-      env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
+              # Verify connection to AKS cluster
+              kubectl cluster-info
 
-# Stage to deploy Prometheus and Grafana via Helm
-- stage: DeployMonitoringStandalone
-  displayName: 'Deploy Prometheus and Grafana without dependencies'
-  jobs:
-  - job: HelmDeployment
-    displayName: 'Deploy Prometheus and Grafana via Helm'
-    steps:
-    - script: |
-        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-        az account set --subscription $(azure_subscription_id)
+              # Install Helm
+              curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
-        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+              # Add Helm repositories
+              helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+              helm repo add grafana https://grafana.github.io/helm-charts
+              helm repo update
 
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+              # Install Prometheus and Grafana
+              helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
+              helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
 
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-        helm repo add grafana https://grafana.github.io/helm-charts
-        helm repo update
+              # Verify that the pods are running
+              kubectl get pods -n monitoring
+            displayName: 'Install Prometheus and Grafana via Helm'
 
-        # Install Prometheus via Helm
-        helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
-        
-        # Install Grafana via Helm
-        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
+  - stage: EnableManagedPrometheusMetrics
+    displayName: 'Enable Managed Prometheus Metrics'
+    jobs:
+      - job: EnablePrometheus
+        displayName: 'Enable Managed Prometheus in AKS'
+        steps:
+          - script: |
+              # Log in to Azure using the service principal
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-        kubectl get pods -n monitoring
-      displayName: 'Install Prometheus and Grafana via Helm'
-      env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
+              # Enable Managed Prometheus in the AKS cluster
+              az aks enable-managed-prometheus --resource-group $(resource_group_name) --name $(aks_name)
+
+              # Verify that Managed Prometheus is enabled
+              kubectl get managedprometheus -n kube-system
+            displayName: 'Enable Managed Prometheus Metrics'
