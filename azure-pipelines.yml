@@ -36,6 +36,40 @@ stages:
               helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
               kubectl get pods -n monitoring
             displayName: 'Install Prometheus and Grafana via Helm'
+  - stage: EnablePrometheusVisualization
+    displayName: 'Enable Managed Prometheus Visualization'
+    jobs:
+      - job: EnablePrometheus
+        displayName: 'Enable Managed Prometheus & Grafana'
+        steps:
+          - script: |
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+
+              # Enable Preview Feature
+              az feature register --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana
+              az feature show --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana --query properties.state
+
+              # Register Provider
+              az provider register --namespace Microsoft.ContainerService
+
+              # Enable Managed Prometheus
+              az aks update -g $(resource_group_name) -n $(aks_cluster_name) --enable-managed-prometheus
+
+              # Create Grafana if not exists
+              az grafana show --name $(grafana_name) --resource-group $(resource_group_name) || \
+              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+
+              # Link Prometheus to Grafana
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
+                "name": "Prometheus",
+                "type": "prometheus",
+                "access": "proxy",
+                "url": "http://prometheus.monitoring.svc.cluster.local",
+                "isDefault": true
+              }'
+            displayName: 'Enable Prometheus & Link to Grafana'
+
   
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Azure Managed Grafana to Prometheus'
