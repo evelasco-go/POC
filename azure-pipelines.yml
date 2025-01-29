@@ -56,3 +56,4 @@ stages:
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
 
+
