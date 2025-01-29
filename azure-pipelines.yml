@@ -10,8 +10,8 @@ variables:
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
   terraformVersion: '1.3.5'
-  node_count: 2
   location: "East US"
+  node_count: 2
   log_analytics_sku: "PerGB2018"
 
   resource_group_name: "Goreg4"
@@ -20,8 +20,10 @@ variables:
   aks_name: "goreg4-aks"
   log_analytics_workspace_name: "goreg4-analytics"
   diagnostic_setting_name: "goreg4-diagnostics"
+  grafana_name: "Goreg4-Grafana"
 
 stages:
+
   - stage: DeployMonitoringStandalone
     displayName: 'Deploy Prometheus and Grafana without dependencies'
     jobs:
@@ -36,13 +38,13 @@ stages:
               # Get AKS credentials
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-              # Verify connection
+              # Verify cluster connection
               kubectl cluster-info
 
               # Install Helm
               curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
-              # Add Helm repositories
+              # Add Helm repos
               helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
               helm repo add grafana https://grafana.github.io/helm-charts
               helm repo update
@@ -62,55 +64,37 @@ stages:
         displayName: 'Enable Managed Prometheus in AKS'
         steps:
           - script: |
-              # Enable Azure CLI preview extensions
-              az config set extension.use_dynamic_install=yes_without_prompt
-
               # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Managed Prometheus
+              # Install required Azure CLI extension
+              az extension add --name monitor-control-service
+
+              # Enable Managed Prometheus in AKS
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
 
-              # Validate Prometheus setup
+              # Verify Managed Prometheus is enabled
               kubectl get managedprometheus -n kube-system
             displayName: 'Enable Managed Prometheus Metrics'
 
-  - stage: LinkGrafana
-    displayName: 'Link Grafana to Managed Prometheus'
+  - stage: LinkGrafanaToPrometheus
+    displayName: 'Link Azure Managed Grafana to Prometheus'
     jobs:
-      - job: SetupGrafana
-        displayName: 'Create and Configure Grafana'
+      - job: LinkGrafana
+        displayName: 'Link Grafana to Managed Prometheus'
         steps:
           - script: |
-              # Enable Azure CLI preview extensions
-              az config set extension.use_dynamic_install=yes_without_prompt
-
               # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Install Azure Managed Grafana extension
-              az extension add --name amg
+              # Enable Managed Grafana if not exists
+              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
 
-              # Check if Grafana instance exists
-              grafana_id=$(az grafana list --resource-group $(resource_group_name) --query "[0].id" -o tsv)
+              # Link Grafana to Prometheus
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url https://$(aks_name).prometheus.monitoring.azure.com --access proxy --is-default true
 
-              if [ -z "$grafana_id" ]; then
-                echo "No Azure Managed Grafana instance found. Creating one..."
-                az grafana create --name Goreg4-Grafana --resource-group $(resource_group_name) --location "$(location)"
-                grafana_id=$(az grafana show --name Goreg4-Grafana --resource-group $(resource_group_name) --query "id" -o tsv)
-              fi
-
-              echo "Grafana instance found: $grafana_id"
-
-              # Link Grafana to Managed Prometheus
-              az grafana data-source create --name Goreg4-Grafana --resource-group $(resource_group_name) \
-                --data-source-name "Azure Monitor" \
-                --type "prometheus" \
-                --url "https://$(aks_name).prometheus.monitoring.azure.com" \
-                --is-default true
-
-              # Verify that Grafana is linked
-              az grafana data-source list --name Goreg4-Grafana --resource-group $(resource_group_name) -o json
-            displayName: 'Configure Grafana Data Source for Managed Prometheus'
+              # Verify link
+              az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
+            displayName: 'Configure Grafana Data Source'
