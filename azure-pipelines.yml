@@ -46,7 +46,13 @@ stages:
           - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
-              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
-              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url http://prometheus.monitoring.svc.cluster.local --access proxy --is-default true
+              
+              # Ensure Grafana exists before proceeding
+              az grafana show --name $(grafana_name) --resource-group $(resource_group_name) || az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+
+              # Configure Prometheus Data Source
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{ "name": "Prometheus", "type": "prometheus", "access": "proxy", "url": "http://prometheus.monitoring.svc.cluster.local", "isDefault": true }'
+
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
+
