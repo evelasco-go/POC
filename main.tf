@@ -68,7 +68,6 @@ output "kubeconfig" {
   sensitive = true
 }
 
-
 # Azure Storage Account
 resource "azurerm_storage_account" "example" {
   name                     = var.storage_account_name
@@ -87,7 +86,6 @@ resource "azurerm_storage_container" "example" {
     prevent_destroy = true
   }
 }
-
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
