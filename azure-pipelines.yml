@@ -29,15 +29,12 @@ stages:
         displayName: 'Deploy Prometheus and Grafana via Helm'
         steps:
           - script: |
-              # Log in to Azure using the service principal
+              # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Get AKS credentials and configure kubectl
+              # Get AKS credentials
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-
-              # Verify connection to AKS cluster
-              kubectl cluster-info
 
               # Install Helm
               curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
@@ -51,7 +48,7 @@ stages:
               helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
               helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
 
-              # Verify that the pods are running
+              # Verify pods
               kubectl get pods -n monitoring
             displayName: 'Install Prometheus and Grafana via Helm'
 
@@ -62,13 +59,13 @@ stages:
         displayName: 'Enable Managed Prometheus in AKS'
         steps:
           - script: |
-              # Log in to Azure using the service principal
+              # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Managed Prometheus in the AKS cluster
-              az aks enable-managed-prometheus --resource-group $(resource_group_name) --name $(aks_name)
+              # Enable Managed Prometheus in AKS
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-addons monitoring --enable-prometheus
 
-              # Verify that Managed Prometheus is enabled
-              kubectl get managedprometheus -n kube-system
+              # Verify the configuration
+              az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.config.prometheus" -o json
             displayName: 'Enable Managed Prometheus Metrics'
