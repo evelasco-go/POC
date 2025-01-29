@@ -47,10 +47,10 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Preview Feature
-              az feature register --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana
-              while [[ "$(az feature show --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana --query properties.state -o tsv)" != "Registered" ]]; do
-                echo "Waiting for feature registration..."
+              # Register correct Prometheus feature
+              az feature register --namespace Microsoft.ContainerService --name AKS-PrometheusAddon
+              while [[ "$(az feature show --namespace Microsoft.ContainerService --name AKS-PrometheusAddon --query properties.state -o tsv)" != "Registered" ]]; do
+                echo "Waiting for AKS-PrometheusAddon feature registration..."
                 sleep 30
               done
 
@@ -74,6 +74,7 @@ stages:
                 "isDefault": true
               }'
             displayName: 'Enable Prometheus & Link to Grafana'
+
 
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Azure Managed Grafana to Prometheus'
