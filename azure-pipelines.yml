@@ -68,13 +68,13 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Install required Azure CLI extension
-              az extension add --name monitor-control-service
+              # Get AKS credentials
+              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-              # Enable Managed Prometheus in AKS
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
+              # Enable Azure Monitor for Containers (Managed Prometheus)
+              az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
 
-              # Verify Managed Prometheus is enabled
+              # Verify that Prometheus is enabled
               kubectl get managedprometheus -n kube-system
             displayName: 'Enable Managed Prometheus Metrics'
 
