@@ -36,6 +36,7 @@ stages:
               helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
               kubectl get pods -n monitoring
             displayName: 'Install Prometheus and Grafana via Helm'
+
   - stage: EnablePrometheusVisualization
     displayName: 'Enable Managed Prometheus Visualization'
     jobs:
@@ -48,17 +49,21 @@ stages:
 
               # Enable Preview Feature
               az feature register --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana
-              az feature show --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana --query properties.state
+              while [[ "$(az feature show --namespace Microsoft.ContainerService --name AKSManagedPrometheusWithGrafana --query properties.state -o tsv)" != "Registered" ]]; do
+                echo "Waiting for feature registration..."
+                sleep 30
+              done
 
               # Register Provider
               az provider register --namespace Microsoft.ContainerService
 
               # Enable Managed Prometheus
-              az aks update -g $(resource_group_name) -n $(aks_cluster_name) --enable-managed-prometheus
+              az aks update -g $(resource_group_name) -n $(aks_name) --enable-managed-prometheus
 
               # Create Grafana if not exists
-              az grafana show --name $(grafana_name) --resource-group $(resource_group_name) || \
-              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name); then
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              fi
 
               # Link Prometheus to Grafana
               az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
@@ -70,7 +75,6 @@ stages:
               }'
             displayName: 'Enable Prometheus & Link to Grafana'
 
-  
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Azure Managed Grafana to Prometheus'
     jobs:
@@ -80,15 +84,20 @@ stages:
           - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
-              
+
               # Check if Grafana exists, if not create it
-              az grafana show --name $(grafana_name) --resource-group $(resource_group_name) || az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name); then
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              fi
 
               # Configure Prometheus Data Source
-              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{ "name": "Prometheus", "type": "prometheus", "access": "proxy", "url": "http://prometheus.monitoring.svc.cluster.local", "isDefault": true }'
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
+                "name": "Prometheus",
+                "type": "prometheus",
+                "access": "proxy",
+                "url": "http://prometheus.monitoring.svc.cluster.local",
+                "isDefault": true
+              }'
 
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
-
-
-
