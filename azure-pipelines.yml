@@ -47,6 +47,10 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+              # Disable monitoring if already enabled
+              az aks disable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+              kubectl get managedprometheus -n kube-system || echo "Managed Prometheus is not available"
+              # Re-enable monitoring
               az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
               kubectl get managedprometheus -n kube-system
             displayName: 'Enable Managed Prometheus Metrics'
