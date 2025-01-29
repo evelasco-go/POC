@@ -63,9 +63,38 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Managed Prometheus in AKS
+              # Enable Prometheus in Azure Monitor
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-addons monitoring --enable-prometheus
 
-              # Verify the configuration
+              # Verify Prometheus is enabled
               az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.config.prometheus" -o json
             displayName: 'Enable Managed Prometheus Metrics'
+
+  - stage: LinkGrafanaToPrometheus
+    displayName: 'Link Azure Managed Prometheus to Grafana'
+    jobs:
+      - job: LinkGrafana
+        displayName: 'Configure Grafana with Azure Monitor'
+        steps:
+          - script: |
+              # Log in to Azure
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+
+              # Get Grafana instance in Azure Monitor
+              grafana_id=$(az grafana list --resource-group $(resource_group_name) --query "[0].id" -o tsv)
+
+              if [ -z "$grafana_id" ]; then
+                echo "No Azure Managed Grafana instance found. Creating one..."
+                az grafana create --name "Goreg4-Grafana" --resource-group $(resource_group_name) --location $(location)
+                grafana_id=$(az grafana show --name "Goreg4-Grafana" --resource-group $(resource_group_name) --query "id" -o tsv)
+              fi
+
+              echo "Grafana instance found: $grafana_id"
+
+              # Link Grafana to Azure Monitor Managed Prometheus
+              az grafana update --name "Goreg4-Grafana" --resource-group $(resource_group_name) --add dataSources name="Azure Monitor" type="prometheus" access="proxy" url="https://$(aks_name).prometheus.monitoring.azure.com" isDefault=true
+
+              # Verify that Grafana is linked
+              az grafana show --name "Goreg4-Grafana" --resource-group $(resource_group_name) --query "properties.dataSources" -o json
+            displayName: 'Link Grafana to Managed Prometheus'
