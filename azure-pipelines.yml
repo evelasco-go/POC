@@ -47,7 +47,7 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
               
-              # Ensure Grafana exists before proceeding
+              # Check if Grafana exists, if not create it
               az grafana show --name $(grafana_name) --resource-group $(resource_group_name) || az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
 
               # Configure Prometheus Data Source
@@ -55,5 +55,6 @@ stages:
 
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
+
 
 
