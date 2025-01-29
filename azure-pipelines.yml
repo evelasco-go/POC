@@ -36,35 +36,17 @@ stages:
               helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
               kubectl get pods -n monitoring
             displayName: 'Install Prometheus and Grafana via Helm'
-
-  - stage: EnableManagedPrometheusMetrics
-    displayName: 'Enable Managed Prometheus Metrics'
-    jobs:
-      - job: EnablePrometheus
-        displayName: 'Enable Managed Prometheus in AKS'
-        steps:
-          - script: |
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
-              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-              # Disable monitoring if already enabled
-              az aks disable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
-              kubectl get managedprometheus -n kube-system || echo "Managed Prometheus is not available"
-              # Re-enable monitoring
-              az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
-              kubectl get managedprometheus -n kube-system
-            displayName: 'Enable Managed Prometheus Metrics'
-
+  
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Azure Managed Grafana to Prometheus'
     jobs:
       - job: LinkGrafana
-        displayName: 'Link Grafana to Managed Prometheus'
+        displayName: 'Link Grafana to Prometheus'
         steps:
           - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
               az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
-              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url https://$(aks_name).prometheus.monitoring.azure.com --access proxy --is-default true
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url http://prometheus.monitoring.svc.cluster.local --access proxy --is-default true
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
