@@ -80,26 +80,41 @@ stages:
             displayName: 'Enable Managed Prometheus Metrics'
 
 
-  - stage: LinkGrafanaToPrometheus
-    displayName: 'Link Azure Managed Grafana to Prometheus'
+  - stage: SetupGrafana
+    displayName: 'Create Managed Grafana in Azure'
     jobs:
-      - job: LinkGrafana
-        displayName: 'Link Grafana to Managed Prometheus'
+      - job: CreateGrafana
+        displayName: 'Ensure Managed Grafana Exists'
         steps:
           - script: |
-              # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Install required Azure CLI extension for Managed Grafana
-              az extension add --name amg
-              az config set extension.use_dynamic_install=yes_without_prompt
+              # Check if Grafana exists
+              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              fi
+            displayName: 'Create Grafana if not exists'
 
-              # Ensure Grafana exists
-              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+  - stage: LinkGrafanaToPrometheus
+    displayName: 'Link Grafana to Managed Prometheus'
+    jobs:
+      - job: LinkGrafana
+        displayName: 'Configure Grafana Data Source'
+        steps:
+          - script: |
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-              # Get the correct Prometheus endpoint
+              # Get Prometheus URL
               PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+
+              # Ensure Prometheus is enabled
+              if [ -z "$PROMETHEUS_URL" ]; then
+                az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+                sleep 60  # Give some time for Prometheus to activate
+                PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+              fi
 
               # Wait for Grafana to be ready
               sleep 30
