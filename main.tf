@@ -20,8 +20,6 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
-
-
 # Resource group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
@@ -43,6 +41,18 @@ resource "azurerm_kubernetes_cluster" "example" {
 
   identity {
     type = "SystemAssigned"
+  }
+
+  # Enabling Azure Managed Prometheus
+  addon_profile {
+    oms_agent {
+      enabled = true
+    }
+
+    # Enable Managed Prometheus
+    managed_prometheus {
+      enabled = true
+    }
   }
 }
 
