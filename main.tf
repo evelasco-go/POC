@@ -28,14 +28,14 @@ resource "azurerm_resource_group" "example" {
 
 # Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
-  name                = var.aks_name
+  name                = var.cluster_name
   location            = var.location
-  resource_group_name = azurerm_resource_group.example.name
-  dns_prefix          = "aks-cluster"
+  resource_group_name = var.resource_group_name
+  dns_prefix          = var.dns_prefix
 
   default_node_pool {
     name       = "default"
-    node_count = var.node_count
+    node_count = 2
     vm_size    = "Standard_DS2_v2"
   }
 
@@ -43,24 +43,19 @@ resource "azurerm_kubernetes_cluster" "example" {
     type = "SystemAssigned"
   }
 
-  # Enabling Azure Monitor and Managed Prometheus
-  addon_profile {
-    oms_agent {
-      enabled = true
-      config {
-        log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
-      }
-    }
+  oms_agent {
+    log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  }
 
-    managed_prometheus {
-      enabled = true
-    }
+  azure_monitor_metrics {
+    enabled = true
   }
 
   tags = {
-    environment = "production"
+    Environment = "dev"
   }
 }
+
 
 # Output kubeconfig (sensitive)
 output "kubeconfig" {
