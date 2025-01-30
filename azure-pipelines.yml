@@ -69,6 +69,54 @@ stages:
               az aks update -g $(resource_group_name) -n $(aks_name) --enable-managed-prometheus
             displayName: 'Enable AKS Managed Prometheus'
 
+  - stage: ConfigureMonitoringAnnotations
+    displayName: 'Configure Workload Monitoring'
+    jobs:
+      - job: AddMonitoringLabels
+        displayName: 'Annotate AKS Pods for Monitoring'
+        steps:
+          - script: |
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+
+              # Annotate namespaces for monitoring
+              kubectl label namespace default monitoring="enabled" --overwrite
+              kubectl label namespace monitoring monitoring="enabled" --overwrite
+
+              # Add monitoring annotations to sample deployment
+              cat <<EOF | kubectl apply -f -
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: sample-app
+                namespace: default
+                labels:
+                  app: sample-app
+              spec:
+                replicas: 2
+                selector:
+                  matchLabels:
+                    app: sample-app
+                template:
+                  metadata:
+                    labels:
+                      app: sample-app
+                    annotations:
+                      prometheus.io/scrape: "true"
+                      prometheus.io/port: "8080"
+                  spec:
+                    containers:
+                      - name: sample-app
+                        image: nginx
+                        ports:
+                          - containerPort: 8080
+              EOF
+
+              # Verify the annotations are applied
+              kubectl get deployment sample-app -o yaml | grep prometheus
+            displayName: 'Annotate Workloads for Prometheus Monitoring'
+
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Azure Managed Grafana to Prometheus'
     jobs:
