@@ -18,81 +18,73 @@ variables:
 
 stages:
   - stage: DeployMonitoringStandalone
-    displayName: 'Deploy Prometheus and Grafana via Helm'
+    displayName: 'Deploy Prometheus and Grafana without dependencies'
     jobs:
       - job: HelmDeployment
-        displayName: 'Deploy Prometheus and Grafana'
+        displayName: 'Deploy Prometheus and Grafana via Helm'
         steps:
           - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
               kubectl cluster-info
-
+              
               # Install Helm
               curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
               helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
               helm repo add grafana https://grafana.github.io/helm-charts
               helm repo update
-
-              # Deploy Prometheus Stack
+              
+              # Deploy Prometheus
               helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
-
+              
               # Deploy Grafana
               helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
               
               # Verify deployment
               kubectl get pods -n monitoring
-            displayName: 'Install Prometheus & Grafana via Helm'
+            displayName: 'Install Prometheus and Grafana via Helm'
 
-  - stage: EnablePrometheusVisualization
-    displayName: 'Enable Managed Prometheus (if available)'
+  - stage: EnableManagedPrometheus
+    displayName: 'Enable Azure Managed Prometheus'
     jobs:
       - job: EnablePrometheus
-        displayName: 'Enable Managed Prometheus & Register Provider'
+        displayName: 'Enable AKS Managed Prometheus'
         steps:
           - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Check if Prometheus addon exists
-              FEATURE_STATUS=$(az feature list --namespace Microsoft.ContainerService --query "[?contains(name, 'Prometheus')].{Name:name, State:properties.state}" -o tsv)
+              # Enable AKS Managed Prometheus Feature
+              az feature register --namespace Microsoft.ContainerService --name AKS-PrometheusAddonPreview
+              while [[ "$(az feature show --namespace Microsoft.ContainerService --name AKS-PrometheusAddonPreview --query properties.state -o tsv)" != "Registered" ]]; do
+                echo "Waiting for feature registration..."
+                sleep 30
+              done
 
-              if [[ -z "$FEATURE_STATUS" ]]; then
-                echo "Prometheus addon feature does not exist. Skipping registration."
-              else
-                echo "Registering AKS-PrometheusAddonPreview..."
-                az feature register --namespace Microsoft.ContainerService --name AKS-PrometheusAddonPreview
-                
-                # Wait for registration
-                while [[ "$(az feature show --namespace Microsoft.ContainerService --name AKS-PrometheusAddonPreview --query properties.state -o tsv)" != "Registered" ]]; do
-                  echo "Waiting for feature registration..."
-                  sleep 30
-                done
+              # Register Provider
+              az provider register --namespace Microsoft.ContainerService
 
-                az provider register --namespace Microsoft.ContainerService
-              fi
-
-              # Enable Managed Prometheus if available
-              az aks update -g $(resource_group_name) -n $(aks_name) --enable-managed-prometheus || echo "Managed Prometheus not supported in this region."
-            displayName: 'Enable Prometheus & Register Provider'
+              # Enable Managed Prometheus in AKS
+              az aks update -g $(resource_group_name) -n $(aks_name) --enable-managed-prometheus
+            displayName: 'Enable AKS Managed Prometheus'
 
   - stage: LinkGrafanaToPrometheus
-    displayName: 'Link Grafana to Prometheus'
+    displayName: 'Link Azure Managed Grafana to Prometheus'
     jobs:
       - job: LinkGrafana
-        displayName: 'Configure Grafana Data Source'
+        displayName: 'Link Grafana to Prometheus'
         steps:
           - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Check if Grafana exists, if not create it
+              # Create Azure Managed Grafana if not exists
               if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name); then
                 az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
               fi
 
-              # Configure Prometheus Data Source
+              # Configure Prometheus Data Source in Grafana
               az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
                 "name": "Prometheus",
                 "type": "prometheus",
@@ -101,5 +93,6 @@ stages:
                 "isDefault": true
               }'
 
+              # Verify data source
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
