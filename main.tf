@@ -28,7 +28,7 @@ resource "azurerm_resource_group" "example" {
 
 # Azure Kubernetes Service Cluster
 resource "azurerm_kubernetes_cluster" "example" {
-  name                = var.cluster_name
+  name                = var.aks_name
   location            = var.location
   resource_group_name = var.resource_group_name
   dns_prefix          = var.dns_prefix
