@@ -46,10 +46,6 @@ resource "azurerm_kubernetes_cluster" "example" {
     log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
   }
 
-  azure_monitor_metrics {
-    enabled = true
-  }
-
   tags = {
     Environment = "dev"
   }
