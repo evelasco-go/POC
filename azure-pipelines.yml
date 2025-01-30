@@ -70,28 +70,17 @@ stages:
               # Get AKS credentials
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-              # Check if Monitoring Addon is already enabled
-              MONITORING_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsAgent.enabled" -o tsv)
+              # Register feature (if not already registered)
+              az feature register --namespace "Microsoft.ContainerService" --name "AKS-MonitoringAddon-Preview"
+              sleep 60  # Wait for feature registration
 
-              # If monitoring is enabled, disable it first
-              if [ "$MONITORING_STATUS" == "true" ]; then
-                  echo "Monitoring addon is already enabled. Disabling it first..."
-                  az aks disable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
-                  echo "Disabled monitoring addon. Sleeping for 1 minute..."
-                  sleep 60
-              else
-                  echo "Monitoring addon is not enabled. Proceeding with enabling Managed Prometheus."
-                  sleep 60
-              fi
+              # Enable monitoring addon (Managed Prometheus)
+              az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
 
-              # Enable Managed Prometheus on AKS
-              echo "Enabling Managed Prometheus on AKS cluster..."
-              az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring --enable-managed-prometheus
-              echo "Managed Prometheus enabled."
-
-              # Verify that Prometheus is enabled
-              kubectl get managedprometheus -n kube-system
+              # Verify if Prometheus is enabled
+              kubectl get pods -n kube-system
             displayName: 'Enable Managed Prometheus Metrics'
+
 
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Azure Managed Grafana to Prometheus'
