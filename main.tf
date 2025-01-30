@@ -20,6 +20,24 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# Provider configuration for random ID generation
+provider "random" {}
+
+# Define variables
+variable "azure_subscription_id" {}
+variable "azure_client_id" {}
+variable "azure_client_secret" {}
+variable "azure_tenant_id" {}
+variable "resource_group_name" {}
+variable "storage_account_name" {}
+variable "container_name" {}
+variable "aks_name" {}
+variable "node_count" {}
+variable "location" {}
+variable "log_analytics_workspace_name" {}
+variable "log_analytics_sku" {}
+variable "diagnostic_setting_name" {}
+
 # Resource group
 resource "azurerm_resource_group" "example" {
   name     = var.resource_group_name
@@ -30,33 +48,26 @@ resource "azurerm_resource_group" "example" {
 resource "azurerm_kubernetes_cluster" "example" {
   name                = var.aks_name
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = azurerm_resource_group.example.name
+  dns_prefix          = "aks-cluster"
 
   default_node_pool {
     name       = "default"
-    node_count = 2
+    node_count = var.node_count
     vm_size    = "Standard_DS2_v2"
   }
 
   identity {
     type = "SystemAssigned"
   }
-
-  oms_agent {
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
-  }
-
-  tags = {
-    Environment = "dev"
-  }
 }
-
 
 # Output kubeconfig (sensitive)
 output "kubeconfig" {
   value     = azurerm_kubernetes_cluster.example.kube_config
   sensitive = true
 }
+
 
 # Azure Storage Account
 resource "azurerm_storage_account" "example" {
@@ -76,6 +87,7 @@ resource "azurerm_storage_container" "example" {
     prevent_destroy = true
   }
 }
+
 
 # Log Analytics Workspace Resource
 resource "azurerm_log_analytics_workspace" "example" {
