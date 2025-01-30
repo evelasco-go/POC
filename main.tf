@@ -42,16 +42,6 @@ resource "azurerm_kubernetes_cluster" "example" {
   identity {
     type = "SystemAssigned"
   }
-
-  # Enabling Azure Managed Prometheus (Corrected method)
-  addon {
-    name    = "monitoring"
-    enabled = true
-    config = {
-      omsagent = "enabled"
-      managedPrometheus = "enabled"
-    }
-  }
 }
 
 # Output kubeconfig (sensitive)
