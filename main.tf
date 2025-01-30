@@ -43,15 +43,13 @@ resource "azurerm_kubernetes_cluster" "example" {
     type = "SystemAssigned"
   }
 
-  # Enabling Azure Managed Prometheus
-  addon_profile {
-    oms_agent {
-      enabled = true
-    }
-
-    # Enable Managed Prometheus
-    managed_prometheus {
-      enabled = true
+  # Enabling Azure Managed Prometheus (Corrected method)
+  addon {
+    name    = "monitoring"
+    enabled = true
+    config = {
+      omsagent = "enabled"
+      managedPrometheus = "enabled"
     }
   }
 }
