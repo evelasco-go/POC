@@ -35,8 +35,11 @@ stages:
               # Register Provider for AKS features
               az provider register --namespace Microsoft.ContainerService
 
+              # Install or update aks-preview extension
+              az extension add --name aks-preview || az extension update --name aks-preview
+
               # Enable Managed Prometheus on the AKS Cluster
-              az aks update -g $(resource_group_name) -n $(aks_name) --enable-managed-prometheus
+              az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring --enable-managed-prometheus
 
               echo "Managed Prometheus enabled successfully in AKS"
             displayName: 'Activate Managed Prometheus'
