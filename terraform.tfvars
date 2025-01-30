@@ -3,7 +3,7 @@ azure_client_id              = "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
 azure_client_secret          = "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
 azure_tenant_id              = "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
 node_count                   = 2
-location                     = "East US"
+location                     = "eastus"
 log_analytics_sku            = "PerGB2018"
 
 resource_group_name          = "Goreg4"
