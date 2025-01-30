@@ -91,12 +91,28 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Managed Grafana if not exists
+              # Install required Azure CLI extension for Managed Grafana
+              az extension add --name amg
+              az config set extension.use_dynamic_install=yes_without_prompt
+
+              # Ensure Grafana exists
               az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
 
-              # Link Grafana to Prometheus
-              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url https://$(aks_name).prometheus.monitoring.azure.com --access proxy --is-default true
+              # Get the correct Prometheus endpoint
+              PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
 
-              # Verify link
+              # Wait for Grafana to be ready
+              sleep 30
+
+              # Add Prometheus data source to Grafana
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
+                  "name": "Azure Monitor Prometheus",
+                  "type": "prometheus",
+                  "access": "proxy",
+                  "url": "'"$PROMETHEUS_URL"'",
+                  "isDefault": true
+              }'
+
+              # Verify data source was added
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
