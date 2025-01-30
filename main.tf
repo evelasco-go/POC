@@ -23,20 +23,6 @@ provider "azurerm" {
 # Provider configuration for random ID generation
 provider "random" {}
 
-# Define variables
-variable "azure_subscription_id" {}
-variable "azure_client_id" {}
-variable "azure_client_secret" {}
-variable "azure_tenant_id" {}
-variable "resource_group_name" {}
-variable "storage_account_name" {}
-variable "container_name" {}
-variable "aks_name" {}
-variable "node_count" {}
-variable "location" {}
-variable "log_analytics_workspace_name" {}
-variable "log_analytics_sku" {}
-variable "diagnostic_setting_name" {}
 
 # Resource group
 resource "azurerm_resource_group" "example" {
