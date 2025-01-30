@@ -93,11 +93,34 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Managed Grafana if not exists
-              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              # Check if Grafana exists
+              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
+                echo "Grafana instance not found. Creating Azure Managed Grafana..."
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+                echo "Grafana created successfully."
+              else
+                echo "Grafana already exists."
+              fi
 
-              # Link Grafana to Prometheus
-              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url https://$(aks_name).prometheus.monitoring.azure.com --access proxy --is-default true
+              # Install Azure Monitor Grafana extension (if not installed)
+              az extension add --name amg --yes
+
+              # Set up Prometheus data source in Grafana
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
+                "name": "Azure Monitor",
+                "type": "grafana-azure-monitor-datasource",
+                "access": "proxy",
+                "jsonData": {
+                  "subscriptionId": "$(azure_subscription_id)",
+                  "azureAuthType": "clientsecret",
+                  "cloudName": "azuremonitor",
+                  "tenantId": "$(azure_tenant_id)",
+                  "clientId": "$(azure_client_id)"
+                },
+                "secureJsonData": {
+                  "clientSecret": "$(azure_client_secret)"
+                }
+              }'
 
               # Verify link
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
