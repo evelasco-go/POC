@@ -55,10 +55,6 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Upgrade Azure CLI & AKS extension
-              az upgrade --yes
-              az extension add --name aks-preview || az extension update --name aks-preview
-
               # Enable AKS Managed Prometheus Feature
               az feature register --namespace Microsoft.ContainerService --name AKS-PrometheusAddonPreview
               while [[ "$(az feature show --namespace Microsoft.ContainerService --name AKS-PrometheusAddonPreview --query properties.state -o tsv)" != "Registered" ]]; do
@@ -69,7 +65,7 @@ stages:
               # Register Provider
               az provider register --namespace Microsoft.ContainerService
 
-              # Enable Managed Prometheus in AKS
+              # Enable Managed Prometheus in AKS (using correct command)
               az aks update -g $(resource_group_name) -n $(aks_name) --enable-managed-prometheus
             displayName: 'Enable AKS Managed Prometheus'
 
