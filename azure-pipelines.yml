@@ -20,81 +20,96 @@ variables:
   grafana_name: "Goreg4-Grafana"
 
 stages:
-    - stage: EnableManagedPrometheusMetrics
-      displayName: 'Enable Managed Prometheus Metrics'
-      jobs:
-        - job: EnablePrometheus
-          displayName: 'Enable Managed Prometheus in AKS'
-          steps:
-            - script: |
-                set -e
 
-                echo "🔑 Logging into Azure..."
-                az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-                az account set --subscription $(azure_subscription_id)
+  - stage: EnableManagedPrometheusMetrics
+    displayName: 'Enable Managed Prometheus Metrics'
+    jobs:
+      - job: EnablePrometheus
+        displayName: 'Enable Managed Prometheus in AKS'
+        steps:
+          - script: |
+              set -e
 
-                echo "🔄 Retrieving AKS Credentials..."
-                az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+              echo "🔑 Logging into Azure..."
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-                echo "🔍 Checking if Prometheus is already enabled..."
-                PROMETHEUS_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus" -o tsv)
+              echo "🔄 Updating Azure CLI and 'aks-preview' extension..."
+              az extension add --name aks-preview || az extension update --name aks-preview
 
-                if [ -z "$PROMETHEUS_STATUS" ]; then
-                  echo "🚀 Enabling Managed Prometheus..."
-                  az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-monitoring
-                  echo "✅ Managed Prometheus enabled successfully!"
-                else
-                  echo "✅ Managed Prometheus is already enabled!"
-                fi
+              echo "🔄 Retrieving AKS Credentials..."
+              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-                echo "🔍 Verifying Prometheus activation..."
-                az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus"
+              echo "🔍 Checking if Prometheus is already enabled..."
+              PROMETHEUS_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus" -o tsv)
 
-                echo "✅ Managed Prometheus setup completed!"
-              displayName: 'Enable and Verify Managed Prometheus'
+              if [ -z "$PROMETHEUS_STATUS" ]; then
+                echo "🚀 Enabling Managed Prometheus..."
+                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
+                echo "✅ Managed Prometheus enabled successfully!"
+                sleep 60  # Ensuring Prometheus is fully enabled
+              else
+                echo "✅ Managed Prometheus is already enabled!"
+              fi
 
-    - stage: SetupGrafana
-      displayName: 'Create Managed Grafana in Azure'
-      jobs:
-        - job: CreateGrafana
-          displayName: 'Ensure Managed Grafana Exists'
-          steps:
-            - script: |
-                az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-                az account set --subscription $(azure_subscription_id)
+              echo "🔍 Verifying Prometheus activation..."
+              az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus"
 
-                if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
-                  az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location "eastus"
-                fi
-              displayName: 'Create Grafana if not exists'
+              echo "✅ Managed Prometheus setup completed!"
+            displayName: 'Enable and Verify Managed Prometheus'
 
-    - stage: LinkGrafanaToPrometheus
-      displayName: 'Link Grafana to Managed Prometheus'
-      jobs:
-        - job: LinkGrafana
-          displayName: 'Configure Grafana Data Source'
-          steps:
-            - script: |
-                az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-                az account set --subscription $(azure_subscription_id)
+  - stage: SetupGrafana
+    displayName: 'Create Managed Grafana in Azure'
+    jobs:
+      - job: CreateGrafana
+        displayName: 'Ensure Managed Grafana Exists'
+        steps:
+          - script: |
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
+              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location "eastus"
+              else
+                echo "✅ Managed Grafana already exists!"
+              fi
+            displayName: 'Create Grafana if not exists'
+
+  - stage: LinkGrafanaToPrometheus
+    displayName: 'Link Grafana to Managed Prometheus'
+    jobs:
+      - job: LinkGrafana
+        displayName: 'Configure Grafana Data Source'
+        steps:
+          - script: |
+              set -e
+
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+
+              echo "🔍 Fetching Prometheus Endpoint..."
+              PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+
+              if [ -z "$PROMETHEUS_URL" ]; then
+                echo "⚠️ Prometheus endpoint not found! Retrying after enabling Prometheus..."
+                az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+                sleep 60
                 PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+              fi
 
-                if [ -z "$PROMETHEUS_URL" ]; then
-                  az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
-                  sleep 60
-                  PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
-                fi
+              echo "✅ Found Prometheus URL: $PROMETHEUS_URL"
+              sleep 30  # Wait to ensure readiness
 
-                sleep 30
+              echo "🔗 Linking Grafana to Prometheus..."
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
+                  "name": "Azure Monitor Prometheus",
+                  "type": "prometheus",
+                  "access": "proxy",
+                  "url": "'$PROMETHEUS_URL'",
+                  "isDefault": true
+              }'
 
-                az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
-                    "name": "Azure Monitor Prometheus",
-                    "type": "prometheus",
-                    "access": "proxy",
-                    "url": "'$PROMETHEUS_URL'",
-                    "isDefault": true
-                }'
-
-                az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
-              displayName: 'Configure Grafana Data Source'
+              echo "🔍 Listing Grafana Data Sources..."
+              az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
+              echo "✅ Grafana Data Source configured!"
+            displayName: 'Configure Grafana Data Source'
