@@ -19,7 +19,7 @@ stages:
     jobs:
       - job: EnableMetricsCollection
         steps:
-        - script: |
+         - script: |
             set -e  # Stop on error
             echo "🔑 Logging into Azure..."
             az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
@@ -36,10 +36,11 @@ stages:
             echo "🔄 Enabling Managed Prometheus..."
             az resource update --resource-group $(resource_group_name) \
               --name $(aks_name) --resource-type Microsoft.ContainerService/managedClusters \
-              --set properties.addonProfiles.omsagent.config.enableManagedPrometheus=true
+              --set properties.addonProfiles.omsagent.config.enableManagedPrometheus='"true"'
 
             echo "✅ Managed Prometheus enabled successfully!"
-          displayName: 'Enable Managed Prometheus'
+           displayName: 'Enable Managed Prometheus'
+
 
 
 
