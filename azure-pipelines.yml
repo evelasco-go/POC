@@ -92,7 +92,7 @@ stages:
 
               # Check if Grafana exists
               if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
-                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location "eastus"
               fi
             displayName: 'Create Grafana if not exists'
 
