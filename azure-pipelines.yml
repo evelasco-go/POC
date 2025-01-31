@@ -9,9 +9,10 @@ variables:
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  location: "East US"
+  location: "eastus"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
+  monitor_workspace: "defaultazuremonitorworkspace-eus"
 
 stages:
   - stage: EnableMetricsCollection
@@ -19,29 +20,34 @@ stages:
     jobs:
       - job: EnableMetricsCollection
         steps:
-         - script: |
-            set -e  # Stop on error
-            echo "🔑 Logging into Azure..."
-            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-            az account set --subscription $(azure_subscription_id)
+          - script: |
+              set -e
+              echo "🔑 Logging into Azure..."
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-            echo "🔍 Checking if Azure Monitor (omsagent) is enabled..."
-            if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent" --output json | grep -q "enabled"; then
-              echo "✅ Azure Monitor is already enabled. Proceeding with Managed Prometheus activation..."
-            else
-              echo "🔄 Enabling Azure Monitor for AKS..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
-            fi
+              echo "🔍 Checking if Azure Monitor (omsagent) is enabled..."
+              MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
 
-            echo "🔄 Enabling Managed Prometheus..."
-            az resource update --resource-group $(resource_group_name) \
-              --name $(aks_name) --resource-type Microsoft.ContainerService/managedClusters \
-              --set properties.addonProfiles.omsagent.config.enableManagedPrometheus='"true"'
+              if [[ "$MONITOR_STATUS" != "true" ]]; then
+                echo "🔄 Enabling Azure Monitor for AKS..."
+                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+              else
+                echo "✅ Azure Monitor is already enabled."
+              fi
 
-            echo "✅ Managed Prometheus enabled successfully!"
-           displayName: 'Enable Managed Prometheus'
+              echo "🔄 Installing k8s-extension if not installed..."
+              if ! az extension list -o tsv | grep -q "k8s-extension"; then
+                az extension add --name k8s-extension
+              fi
 
+              echo "🔄 Uninstalling aks-preview extension if installed..."
+              if az extension list -o tsv | grep -q "aks-preview"; then
+                az extension remove --name aks-preview
+              fi
 
+              echo "🔄 Enabling Managed Prometheus..."
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
 
-
-
+              echo "✅ Managed Prometheus enabled successfully!"
+            displayName: 'Enable Azure Monitor and Managed Prometheus'
