@@ -26,10 +26,13 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
+              echo "🔄 Disabling monitoring addon if already enabled..."
+              az aks disable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) || echo "Monitoring addon not enabled previously."
+
               echo "🔄 Enabling Azure Monitor for containers..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
 
-              echo "🔄 Ensuring Managed Prometheus is activated..."
+              echo "🔄 Enabling Managed Prometheus..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
 
               echo "🔄 Enabling Managed Grafana for visualization..."
@@ -37,4 +40,4 @@ stages:
 
               echo "✅ Managed Prometheus and Grafana enabled successfully!"
 
-            displayName: 'Enable Metrics Collection and Visualization'
+               displayName: 'Enable Metrics Collection and Visualization'
