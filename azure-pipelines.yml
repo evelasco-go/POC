@@ -19,28 +19,23 @@ stages:
     jobs:
       - job: EnableMetricsCollection
         steps:
-          - script: |
-              set -e
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
+         - script: |
+            set -e
+            echo "🔑 Logging into Azure..."
+            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+            az account set --subscription $(azure_subscription_id)
 
-              echo "🔄 Disabling monitoring addon if already enabled..."
-              az aks disable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) || echo "Monitoring addon not enabled previously."
+            echo "🔄 Checking Managed Prometheus feature..."
+            FEATURE_STATE=$(az feature show --namespace "Microsoft.ContainerService" --name "ManagedPrometheus" --query properties.state -o tsv || echo "NotFound")
 
-              echo "🔄 Enabling Azure Monitor for containers..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
-
-              echo "🔄 Enabling Managed Prometheus via feature registration..."
-              az feature register --namespace Microsoft.ContainerService --name ManagedPrometheus
-              echo "Waiting for feature registration to complete..."
-              az feature wait --namespace Microsoft.ContainerService --name ManagedPrometheus || echo "Managed Prometheus feature registration failed. It might not be available in this region or subscription."
-
+            if [ "$FEATURE_STATE" != "Registered" ]; then
+              echo "❌ Managed Prometheus feature is not available. Skipping..."
+            else
               echo "🔄 Registering Microsoft.ContainerService provider..."
               az provider register --namespace Microsoft.ContainerService
 
-              echo "🔄 Enabling Managed Grafana for visualization..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
+              echo "🔄 Enabling Managed Prometheus..."
+              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
+            fi
+            displayName: 'Enable Managed Prometheus if Available'
 
-              echo "✅ Managed Prometheus and Grafana enabled successfully!"
-            displayName: 'Enable Metrics Collection and Visualization'
