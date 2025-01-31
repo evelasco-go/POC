@@ -9,7 +9,7 @@ variables:
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  location: "East US"
+  location: "eastus"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
 
@@ -33,15 +33,12 @@ stages:
                 echo "✅ Azure Monitor is already enabled."
               fi
 
-              echo "🔄 Enabling Managed Prometheus via az resource update..."
-              az resource update --ids $(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "id" -o tsv) --set properties.addonProfiles.azuremonitor-metrics.enabled=true
+              echo "🔄 Enabling Managed Prometheus for AKS..."
+              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
 
-              echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
+              echo "✅ Managed Prometheus enabled successfully!"
+            displayName: 'Enable Azure Monitor and Managed Prometheus'
 
-              echo "✅ Managed Prometheus, Grafana enabled successfully!"
-
-            displayName: 'Enable Azure Monitor, Managed Prometheus, and Grafana'
 
   - stage: ConfigurePrometheusRecordingRules
     displayName: 'Configure Prometheus Recording Rules'
