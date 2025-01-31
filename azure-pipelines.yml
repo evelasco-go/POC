@@ -12,6 +12,7 @@ variables:
   location: "East US"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
+  workspace_resource_id: "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/defaultazuremonitorworkspace-eus"
 
 stages:
   - stage: EnableMetricsCollection
@@ -38,6 +39,14 @@ stages:
 
               echo "🔄 Registering Microsoft.ContainerService provider..."
               az provider register --namespace Microsoft.ContainerService
+
+              echo "🔄 Enabling Managed Prometheus and associating with Azure Monitor workspace..."
+              az aks enable-addons \
+                --addons monitoring \
+                --resource-group $(resource_group_name) \
+                --name $(aks_name) \
+                --enable-managed-prometheus \
+                --workspace-resource-id $(workspace_resource_id)
 
               echo "🔄 Enabling Managed Grafana for visualization..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
