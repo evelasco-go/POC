@@ -12,7 +12,6 @@ variables:
   location: "East US"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
-  monitor_workspace: "defaultazuremonitorworkspace-eus"
 
 stages:
   - stage: EnableMetricsCollection
@@ -26,35 +25,43 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔍 Checking if Azure Monitor (omsagent) is enabled..."
-              MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
-
-              if [[ "$MONITOR_STATUS" != "true" ]]; then
+              echo "🔄 Checking if Azure Monitor is enabled..."
+              if ! az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv; then
                 echo "🔄 Enabling Azure Monitor for AKS..."
-                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
               else
                 echo "✅ Azure Monitor is already enabled."
               fi
 
-              echo "🔄 Installing k8s-extension if not installed..."
-              if ! az extension list -o tsv | grep -q "k8s-extension"; then
-                az extension add --name k8s-extension
-              fi
-
-              echo "🔄 Uninstalling aks-preview extension if installed..."
-              if az extension list -o tsv | grep -q "aks-preview"; then
-                az extension remove --name aks-preview
-              fi
-
-              echo "🔄 Enabling Managed Prometheus..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
+              echo "🔄 Enabling Managed Prometheus via az resource update..."
+              az resource update --ids $(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "id" -o tsv) --set properties.addonProfiles.azuremonitor-metrics.enabled=true
 
               echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
-              # Assuming managed Grafana can be enabled through Azure Portal or CLI command (you may need to verify the correct method)
-              echo "✅ Managed Grafana and Prometheus visualizations enabled successfully!"
+              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
 
-              echo "🔄 Enabling recording rules for Prometheus..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-recording-rules
+              echo "✅ Managed Prometheus, Grafana enabled successfully!"
 
-              echo "✅ Managed Prometheus, Grafana, and recording rules enabled successfully!"
-            displayName: 'Enable Azure Monitor, Managed Prometheus, Grafana, and Recording Rules'
+            displayName: 'Enable Azure Monitor, Managed Prometheus, and Grafana'
+
+  - stage: ConfigurePrometheusRecordingRules
+    displayName: 'Configure Prometheus Recording Rules'
+    jobs:
+      - job: ConfigurePrometheusRecordingRules
+        steps:
+          - script: |
+              echo "🔄 Applying Prometheus Recording Rules ConfigMap..."
+              kubectl apply -f "$(Build.SourcesDirectory)/prometheus-recording-rules.yaml"
+
+              echo "✅ Prometheus Recording Rules applied successfully!"
+            displayName: 'Apply Prometheus Recording Rules'
+
+# Prometheus Recording Rules ConfigMap
+resources:
+  repositories:
+    - repository: self
+      type: git
+      name: 'your-repository-name'
+      ref: refs/heads/$(Build.SourceBranchName)
+  
+# You can directly include the recording rules as a file in the pipeline repository
+# This assumes 'prometheus-recording-rules.yaml' is part of your repo
