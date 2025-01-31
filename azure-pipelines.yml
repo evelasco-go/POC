@@ -66,16 +66,22 @@ stages:
       - job: CreateGrafana
         displayName: 'Ensure Managed Grafana Exists'
         steps:
-          - script: |
+         - script: |
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
               if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
-                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+                echo "Creating Managed Grafana instance..."
+                az grafana create \
+                  --name $(grafana_name) \
+                  --resource-group $(resource_group_name) \
+                  --location $(location) \
+                  --enable-managed-service-principal true
               else
                 echo "✅ Managed Grafana already exists!"
               fi
-            displayName: 'Create Grafana if not exists'
+              displayName: 'Create Grafana if not exists'
+
 
   - stage: LinkGrafanaToPrometheus
     displayName: 'Link Grafana to Managed Prometheus'
