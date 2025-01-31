@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-recording-rules
+  namespace: monitoring
+  labels:
+    app: prometheus
+data:
+  prometheus-recording-rules.yaml: |
+    groups:
+    - name: custom-recording-rules
+      rules:
+      - record: job:http_requests:sum
+        expr: sum(rate(http_requests_total[5m])) by (job)
+      - record: job:http_request_duration_seconds:avg
+        expr: avg(http_request_duration_seconds) by (job)
