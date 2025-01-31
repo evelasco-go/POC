@@ -36,8 +36,11 @@ stages:
               echo "Waiting for feature registration to complete..."
               az feature wait --namespace Microsoft.ContainerService --name ManagedPrometheus
 
+              echo "🔄 Registering Microsoft.ContainerService provider..."
+              az provider register --namespace Microsoft.ContainerService
+
               echo "🔄 Enabling Managed Grafana for visualization..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
 
               echo "✅ Managed Prometheus and Grafana enabled successfully!"
-              displayName: 'Enable Metrics Collection and Visualization'
+            displayName: 'Enable Metrics Collection and Visualization'
