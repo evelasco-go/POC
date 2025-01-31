@@ -12,7 +12,6 @@ variables:
   location: "East US"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
-  grafana_name: "Goreg4-Grafana"
 
 stages:
   - stage: EnableMetricsCollection
@@ -32,12 +31,13 @@ stages:
               echo "🔄 Enabling Azure Monitor for containers..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
 
-              echo "🔄 Enabling Managed Prometheus..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
+              echo "🔄 Enabling Managed Prometheus via feature registration..."
+              az feature register --namespace Microsoft.ContainerService --name ManagedPrometheus
+              echo "Waiting for feature registration to complete..."
+              az feature wait --namespace Microsoft.ContainerService --name ManagedPrometheus
 
               echo "🔄 Enabling Managed Grafana for visualization..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
 
               echo "✅ Managed Prometheus and Grafana enabled successfully!"
-
-               displayName: 'Enable Metrics Collection and Visualization'
+              displayName: 'Enable Metrics Collection and Visualization'
