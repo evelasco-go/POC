@@ -20,23 +20,23 @@ stages:
       - job: EnableMetricsCollection
         steps:
         - script: |
-            set -e  # Stop script execution if any command fails
+            set -e  # Stop on error
             echo "🔑 Logging into Azure..."
             az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
             az account set --subscription $(azure_subscription_id)
 
-            # Verify login
-            if ! az account show > /dev/null 2>&1; then
-              echo "❌ Azure login failed. Exiting..."
-              exit 1
-            fi
+            # Enable Azure Monitor (required for Managed Prometheus)
+            echo "🔄 Enabling Azure Monitor for AKS..."
+            az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
 
-            echo "🔄 Enabling Managed Prometheus via az resource update..."
+            # Enable Managed Prometheus via az resource update
+            echo "🔄 Enabling Managed Prometheus..."
             az resource update --resource-group $(resource_group_name) \
               --name $(aks_name) --resource-type Microsoft.ContainerService/managedClusters \
-              --set properties.addonProfiles.azuremonitor-metrics.config.enableManagedPrometheus=true
+              --set properties.addonProfiles.omsagent.config.enableManagedPrometheus=true
 
             echo "✅ Managed Prometheus enabled successfully!"
-          displayName: 'Enable Managed Prometheus via az resource update'
+          displayName: 'Enable Azure Monitor and Managed Prometheus'
+
 
 
