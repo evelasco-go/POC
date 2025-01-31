@@ -33,11 +33,13 @@ stages:
                 echo "✅ Azure Monitor is already enabled."
               fi
 
-              echo "🔄 Enabling Managed Prometheus for AKS..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
+              echo "🔄 Registering Managed Prometheus feature..."
+              az feature register --namespace Microsoft.ContainerService --name ManagedPrometheus
+              echo "✅ Managed Prometheus feature registered successfully."
+              
+              echo "🔄 Please manually enable Managed Prometheus in the Azure Portal."
+            displayName: 'Enable Azure Monitor and Register Managed Prometheus'
 
-              echo "✅ Managed Prometheus enabled successfully!"
-            displayName: 'Enable Azure Monitor and Managed Prometheus'
 
 
   - stage: ConfigurePrometheusRecordingRules
