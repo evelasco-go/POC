@@ -26,12 +26,15 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
+              echo "🔄 Disabling existing Azure Monitor for containers..."
+              az aks disable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
+
               echo "🔄 Enabling Azure Monitor for containers..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
 
-              echo "🔄 Enabling Managed Prometheus for metrics collection..."
+              echo "🔄 Enabling Managed Prometheus with visualization..."
               az aks enable-addons --addons monitoring --enable-managed-prometheus --resource-group $(resource_group_name) --name $(aks_name)
 
-              echo "✅ Metrics collection and Managed Prometheus enabled successfully!"
+              echo "✅ Metrics collection and Managed Prometheus with visualization enabled successfully!"
 
               displayName: 'Enable Metrics Collection for AKS Cluster'
