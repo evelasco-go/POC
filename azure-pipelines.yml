@@ -16,8 +16,8 @@ variables:
 
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
-  log_analytics_workspace_name: "goreg4-analytics"
-  grafana_name: "Goreg4-Grafana"
+  log_analytics_workspace_name: "defaultazuremonitorworkspace-eus"
+  grafana_name: "grafana-202384191025-eu"
 
 stages:
 
@@ -43,6 +43,7 @@ stages:
               echo "🔍 Checking if Prometheus is already enabled..."
               PROMETHEUS_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus" -o tsv)
 
+              # Check if Prometheus is enabled, if not, enable it
               if [ -z "$PROMETHEUS_STATUS" ]; then
                 echo "🚀 Enabling Managed Prometheus..."
                 az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) || echo "⚠️ Prometheus is already enabled, skipping."
@@ -52,8 +53,9 @@ stages:
                 echo "✅ Managed Prometheus is already enabled!"
               fi
 
-              echo "🔍 Verifying Prometheus activation..."
-              az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus"
+              echo "🔍 Checking if Managed Prometheus is properly enabled..."
+              # Check if the specific managed Prometheus preview features are enabled
+              az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint"
 
               echo "✅ Managed Prometheus setup completed!"
             displayName: 'Enable and Verify Managed Prometheus'
@@ -69,7 +71,7 @@ stages:
               az account set --subscription $(azure_subscription_id)
 
               if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
-                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location "eastus"
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
               else
                 echo "✅ Managed Grafana already exists!"
               fi
