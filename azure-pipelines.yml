@@ -9,10 +9,9 @@ variables:
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  location: "eastus"
+  location: "East US"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
-  workspace_resource_id: "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/defaultazuremonitorworkspace-eus"  # Ensure this points to your existing Azure Monitor workspace.
 
 stages:
   - stage: EnableMetricsCollection
@@ -35,19 +34,10 @@ stages:
               echo "🔄 Enabling Managed Prometheus via feature registration..."
               az feature register --namespace Microsoft.ContainerService --name ManagedPrometheus
               echo "Waiting for feature registration to complete..."
-              az feature wait --namespace Microsoft.ContainerService --name ManagedPrometheus
+              az feature wait --namespace Microsoft.ContainerService --name ManagedPrometheus || echo "Managed Prometheus feature registration failed. It might not be available in this region or subscription."
 
-              # Ensure provider registration if needed
               echo "🔄 Registering Microsoft.ContainerService provider..."
               az provider register --namespace Microsoft.ContainerService
-
-              echo "🔄 Enabling Managed Prometheus on AKS..."
-              az aks enable-addons \
-                --addons monitoring \
-                --resource-group $(resource_group_name) \
-                --name $(aks_name) \
-                --enable-managed-prometheus \
-                --workspace-resource-id $(workspace_resource_id)
 
               echo "🔄 Enabling Managed Grafana for visualization..."
               az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-grafana
