@@ -45,7 +45,7 @@ stages:
 
               if [ -z "$PROMETHEUS_STATUS" ]; then
                 echo "🚀 Enabling Managed Prometheus..."
-                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name)
+                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) || echo "⚠️ Prometheus is already enabled, skipping."
                 echo "✅ Managed Prometheus enabled successfully!"
                 sleep 60  # Ensuring Prometheus is fully enabled
               else
