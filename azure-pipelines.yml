@@ -52,7 +52,7 @@ stages:
               echo "✅ Managed Prometheus enabled successfully!"
 
               echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
-              az aks enable-addons --addons grafana --resource-group $(resource_group_name) --name $(aks_name)
+              az monitor metrics-advisor create --resource-group $(resource_group_name) --workspace $(monitor_workspace) --name grafana --location $(location)
               echo "✅ Managed Grafana enabled successfully for Prometheus visualizations."
 
               echo "🔄 Enabling Prometheus Recording Rules..."
