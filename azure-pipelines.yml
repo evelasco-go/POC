@@ -9,10 +9,10 @@ variables:
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  location: "East US"
+  location: "eastus"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
-  workspace_resource_id: "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/defaultazuremonitorworkspace-eus"
+  workspace_resource_id: "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/defaultazuremonitorworkspace-eus"  # Ensure this points to your existing Azure Monitor workspace.
 
 stages:
   - stage: EnableMetricsCollection
@@ -37,10 +37,11 @@ stages:
               echo "Waiting for feature registration to complete..."
               az feature wait --namespace Microsoft.ContainerService --name ManagedPrometheus
 
+              # Ensure provider registration if needed
               echo "🔄 Registering Microsoft.ContainerService provider..."
               az provider register --namespace Microsoft.ContainerService
 
-              echo "🔄 Enabling Managed Prometheus and associating with Azure Monitor workspace..."
+              echo "🔄 Enabling Managed Prometheus on AKS..."
               az aks enable-addons \
                 --addons monitoring \
                 --resource-group $(resource_group_name) \
