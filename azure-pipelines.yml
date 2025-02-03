@@ -16,7 +16,7 @@ variables:
 
 stages:
   - stage: EnablePrometheus
-    displayName: 'Enable Prometheus and Recording Rules'
+    displayName: 'Enable Prometheus'
     jobs:
       - job: EnablePrometheus
         steps:
@@ -26,7 +26,7 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔄 Enabling Azure Monitor for AKS..."
+              echo "🔄 Enabling Azure Monitor for AKS (omsagent)..."
               MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
 
               if [[ "$MONITOR_STATUS" != "true" ]]; then
@@ -36,11 +36,46 @@ stages:
                 echo "✅ Azure Monitor is already enabled."
               fi
 
+              echo "🔄 Installing k8s-extension if not installed..."
+              if ! az extension list -o tsv | grep -q "k8s-extension"; then
+                az extension add --name k8s-extension
+              fi
+
+              echo "🔄 Uninstalling aks-preview extension if installed..."
+              if az extension list -o tsv | grep -q "aks-preview"; then
+                az extension remove --name aks-preview
+              fi
+
               echo "🔄 Enabling Managed Prometheus..."
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
 
-              echo "🔄 Enabling Recording Rules for Prometheus..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-recording-rules
+              echo "✅ Managed Prometheus enabled successfully!"
+            displayName: 'Enable Prometheus'
 
-              echo "✅ Managed Prometheus and Recording Rules enabled successfully!"
-            displayName: 'Enable Prometheus and Recording Rules'
+  - stage: ApplyPrometheusRecordingRules
+    displayName: 'Apply Prometheus Recording Rules'
+    jobs:
+      - job: ApplyPrometheusRecordingRules
+        steps:
+          - script: |
+              echo "🔄 Applying Prometheus recording rules..."
+
+              # Create a PrometheusRule resource for recording rules
+              cat <<EOF | kubectl apply -f -
+              apiVersion: monitoring.coreos.com/v1
+              kind: PrometheusRule
+              metadata:
+                name: example-prometheus-rule
+                namespace: monitoring
+              spec:
+                groups:
+                - name: example.rules
+                  rules:
+                  - record: job:requests:sum
+                    expr: sum(rate(http_requests_total[5m])) by (job)
+                  - record: job:duration:avg
+                    expr: avg(http_duration_seconds_sum / http_duration_seconds_count) by (job)
+              EOF
+
+              echo "✅ Prometheus recording rules applied successfully!"
+            displayName: 'Apply Prometheus Recording Rules'
