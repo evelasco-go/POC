@@ -27,26 +27,24 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
-              az role assignment create --assignee $(azure_client_id) \
-                --role "Monitoring Metrics Publisher" \
-                --scope /subscriptions/$(azure_subscription_id)
-
-              echo "🔄 Enabling Azure Monitor for AKS..."
-              az aks enable-addons --addons monitoring \
-                --resource-group $(resource_group_name) \
-                --name $(aks_name) \
-                --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
-
-              echo "🔄 Installing k8s-extension if not installed..."
-              if ! az extension list -o tsv | grep -q "k8s-extension"; then
-                az extension add --name k8s-extension
+              echo "🔄 Checking if 'Monitoring Metrics Publisher' Role is assigned..."
+              if ! az role assignment list --assignee $(azure_client_id) --role "Monitoring Metrics Publisher" --query "[].roleDefinitionName" -o tsv | grep -q "Monitoring Metrics Publisher"; then
+                echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
+                az role assignment create --assignee $(azure_client_id) \
+                  --role "Monitoring Metrics Publisher" \
+                  --scope /subscriptions/$(azure_subscription_id)
+              else
+                echo "✅ Role already assigned. Skipping."
               fi
 
-              echo "🔄 Enabling Managed Prometheus..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
-
-              echo "✅ Managed Prometheus enabled successfully!"
+              echo "🔄 Checking if Managed Prometheus is enabled..."
+              if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.azureMonitorProfile.enabled" -o tsv | grep -q "true"; then
+                echo "✅ Managed Prometheus is already enabled. Skipping."
+              else
+                echo "🔄 Enabling Managed Prometheus..."
+                az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
+                echo "✅ Managed Prometheus enabled successfully!"
+              fi
             displayName: 'Enable Prometheus'
 
   - stage: DeployPrometheus
