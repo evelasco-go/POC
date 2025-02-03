@@ -15,10 +15,10 @@ variables:
   monitor_workspace: "defaultazuremonitorworkspace-eus"
 
 stages:
-  - stage: EnableMetricsCollection
-    displayName: 'Enable Metrics Collection for AKS Cluster'
+  - stage: EnablePrometheus
+    displayName: 'Enable Prometheus'
     jobs:
-      - job: EnableMetricsCollection
+      - job: EnablePrometheus
         steps:
           - script: |
               set -e
@@ -26,7 +26,7 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔍 Checking if Azure Monitor (omsagent) is enabled..."
+              echo "🔄 Enabling Azure Monitor for AKS (omsagent)..."
               MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
 
               if [[ "$MONITOR_STATUS" != "true" ]]; then
@@ -50,8 +50,4 @@ stages:
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
 
               echo "✅ Managed Prometheus enabled successfully!"
-
-              echo "🔄 Enabling Prometheus Recording Rules..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-recording-rules
-              echo "✅ Prometheus recording rules enabled successfully."
-            displayName: 'Enable Azure Monitor and Managed Prometheus'
+            displayName: 'Enable Prometheus'
