@@ -27,11 +27,20 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
+              echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
+              az role assignment create --assignee $(azure_client_id) \
+                --role "Monitoring Metrics Publisher" \
+                --scope /subscriptions/$(azure_subscription_id)
+
               echo "🔄 Enabling Azure Monitor for AKS..."
-              if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv | grep -q "true"; then
-                echo "✅ Azure Monitor is already enabled."
-              else
-                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+              az aks enable-addons --addons monitoring \
+                --resource-group $(resource_group_name) \
+                --name $(aks_name) \
+                --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+
+              echo "🔄 Installing k8s-extension if not installed..."
+              if ! az extension list -o tsv | grep -q "k8s-extension"; then
+                az extension add --name k8s-extension
               fi
 
               echo "🔄 Enabling Managed Prometheus..."
@@ -47,18 +56,8 @@ stages:
         steps:
           - script: |
               set -e
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
-
               echo "🔄 Setting AKS context..."
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name) --overwrite-existing
-
-              echo "🔄 Verifying kubectl connection..."
-              if ! kubectl cluster-info; then
-                echo "❌ ERROR: Kubernetes cluster is not reachable."
-                exit 1
-              fi
 
               echo "🔄 Deploying Prometheus..."
               cat <<EOF | kubectl apply -f -
@@ -89,5 +88,5 @@ stages:
                         value: "$(aks_name)"
               EOF
 
-              echo "✅ Prometheus deployment applied successfully!"
+              echo "✅ Prometheus deployed successfully!"
             displayName: 'Deploy Prometheus'
