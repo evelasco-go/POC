@@ -14,6 +14,10 @@ variables:
   aks_name: "goreg4-aks"
   monitor_workspace: "defaultazuremonitorworkspace-eus"
 
+  ingestion_url: "https://defaultazuremonitorworkspace-eastus-964j.eastus-1.metrics.ingest.monitor.azure.com/dataCollectionRules/dcr-57a879c781d44ab38afebcb72da1944e/streams/Microsoft-PrometheusMetrics/api/v1/write?api-version=2023-04-24"
+  managed_identity_client_id: "$(azure_client_id)"  # Using azure_client_id directly
+  cluster_name: "$(aks_name)"  # Making sure cluster_name matches aks_name
+
 stages:
   - stage: EnablePrometheus
     displayName: 'Enable Prometheus'
@@ -26,24 +30,12 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔄 Enabling Azure Monitor for AKS (omsagent)..."
-              MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
-
-              if [[ "$MONITOR_STATUS" != "true" ]]; then
-                echo "🔄 Enabling Azure Monitor for AKS..."
-                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
-              else
-                echo "✅ Azure Monitor is already enabled."
-              fi
+              echo "🔄 Enabling Azure Monitor for AKS..."
+              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
 
               echo "🔄 Installing k8s-extension if not installed..."
               if ! az extension list -o tsv | grep -q "k8s-extension"; then
                 az extension add --name k8s-extension
-              fi
-
-              echo "🔄 Uninstalling aks-preview extension if installed..."
-              if az extension list -o tsv | grep -q "aks-preview"; then
-                az extension remove --name aks-preview
               fi
 
               echo "🔄 Enabling Managed Prometheus..."
@@ -52,27 +44,52 @@ stages:
               echo "✅ Managed Prometheus enabled successfully!"
             displayName: 'Enable Prometheus'
 
-  - stage: ApplyPrometheusRecordingRules
-    displayName: 'Apply Prometheus Recording Rules'
+  - stage: DeployPrometheus
+    displayName: 'Deploy Prometheus'
     jobs:
-      - job: ApplyPrometheusRecordingRules
+      - job: DeployPrometheus
         steps:
           - script: |
-              echo "🔑 Logging into Azure again to ensure session is active..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
-            displayName: 'Azure Login for AKS Context'
-
-          - script: |
               echo "🔄 Setting AKS context..."
-              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-            displayName: 'Set AKS Context'
+              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name) --overwrite-existing
 
-          - script: |
-              echo "🔄 Checking kubectl connectivity..."
-              kubectl cluster-info
-            displayName: 'Check kubectl Connectivity'
+              echo "🔄 Deploying Prometheus..."
+              cat <<EOF | kubectl apply -f -
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: prometheus
+                namespace: monitoring
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app: prometheus
+                template:
+                  metadata:
+                    labels:
+                      app: prometheus
+                  spec:
+                    containers:
+                    - name: prometheus
+                      image: mcr.microsoft.com/azuremonitor/containerinsights/ciprod/prometheus-remote-write/images:prom-remotewrite-20240617.1
+                      env:
+                      - name: INGESTION_URL
+                        value: "$(ingestion_url)"
+                      - name: MANAGED_IDENTITY_CLIENT_ID
+                        value: "$(managed_identity_client_id)"
+                      - name: CLUSTER_NAME
+                        value: "$(cluster_name)"
+              EOF
 
+              echo "✅ Prometheus deployment applied successfully!"
+            displayName: 'Deploy Prometheus'
+
+  - stage: ApplyRecordingRules
+    displayName: 'Apply Prometheus Recording Rules'
+    jobs:
+      - job: ApplyRecordingRules
+        steps:
           - script: |
               echo "🔄 Applying Prometheus recording rules..."
               cat <<EOF | kubectl apply -f -
@@ -85,10 +102,15 @@ stages:
                 groups:
                 - name: example.rules
                   rules:
-                  - record: job:requests:sum
-                    expr: sum(rate(http_requests_total[5m])) by (job)
-                  - record: job:duration:avg
-                    expr: avg(http_duration_seconds_sum / http_duration_seconds_count) by (job)
+                  - alert: ExampleAlert
+                    expr: up == 0
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "Instance down"
+                      description: "This instance is down for more than 5 minutes"
               EOF
+
               echo "✅ Prometheus recording rules applied successfully!"
             displayName: 'Apply Prometheus Recording Rules'
