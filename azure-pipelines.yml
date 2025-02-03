@@ -58,9 +58,17 @@ stages:
       - job: ApplyPrometheusRecordingRules
         steps:
           - script: |
-              echo "🔄 Applying Prometheus recording rules..."
+              echo "🔄 Setting AKS context..."
+              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+            displayName: 'Set AKS Context'
 
-              # Create a PrometheusRule resource for recording rules
+          - script: |
+              echo "🔄 Checking kubectl connectivity..."
+              kubectl cluster-info
+            displayName: 'Check kubectl Connectivity'
+
+          - script: |
+              echo "🔄 Applying Prometheus recording rules..."
               cat <<EOF | kubectl apply -f -
               apiVersion: monitoring.coreos.com/v1
               kind: PrometheusRule
@@ -76,6 +84,5 @@ stages:
                   - record: job:duration:avg
                     expr: avg(http_duration_seconds_sum / http_duration_seconds_count) by (job)
               EOF
-
               echo "✅ Prometheus recording rules applied successfully!"
             displayName: 'Apply Prometheus Recording Rules'
