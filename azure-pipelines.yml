@@ -16,88 +16,87 @@ variables:
   ingestion_url: "https://defaultazuremonitorworkspace-eastus-964j.eastus-1.metrics.ingest.monitor.azure.com/dataCollectionRules/dcr-57a879c781d44ab38afebcb72da1944e/streams/Microsoft-PrometheusMetrics/api/v1/write?api-version=2023-04-24"
 
 stages:
-  - stage: EnablePrometheus
-    displayName: 'Enable Prometheus'
-    jobs:
-      - job: EnablePrometheus
-        steps:
-          - script: |
-              set -e
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
+   - stage: EnablePrometheus
+     displayName: 'Enable Prometheus'
+     jobs:
+       - job: EnablePrometheus
+         steps:
+           - script: |
+               set -e
+               echo "🔑 Logging into Azure..."
+               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+               az account set --subscription $(azure_subscription_id)
 
-              echo "🔍 Checking if Service Principal exists..."
-              SP_EXISTS=$(az ad sp show --id $(azure_client_id) --query "appId" -o tsv || echo "not_found")
-              if [ "$SP_EXISTS" = "not_found" ]; then
-                echo "❌ ERROR: Service Principal not found! Please verify the Client ID."
-                exit 1
-              else
-                echo "✅ Service Principal exists."
-              fi
+               echo "🔍 Checking if Service Principal exists..."
+               SP_EXISTS=$(az ad sp show --id $(azure_client_id) --query "appId" -o tsv || echo "not_found")
+               if [ "$SP_EXISTS" = "not_found" ]; then
+                 echo "❌ ERROR: Service Principal not found! Please verify the Client ID."
+                 exit 1
+               else
+                 echo "✅ Service Principal exists."
+               fi
 
-              echo "🔄 Checking if 'Monitoring Metrics Publisher' Role is assigned..."
-              if ! az role assignment list --assignee $(azure_client_id) --role "Monitoring Metrics Publisher" --query "[].roleDefinitionName" -o tsv | grep -q "Monitoring Metrics Publisher"; then
-                echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
-                az role assignment create --assignee $(azure_client_id) \
-                  --role "Monitoring Metrics Publisher" \
-                  --scope /subscriptions/$(azure_subscription_id)
-              else
-                echo "✅ Role already assigned. Skipping."
-              fi
+               echo "🔄 Checking if 'Monitoring Metrics Publisher' Role is assigned..."
+               if ! az role assignment list --assignee $(azure_client_id) --role "Monitoring Metrics Publisher" --query "[].roleDefinitionName" -o tsv | grep -q "Monitoring Metrics Publisher"; then
+                 echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
+                 az role assignment create --assignee $(azure_client_id) \
+                   --role "Monitoring Metrics Publisher" \
+                   --scope /subscriptions/$(azure_subscription_id)
+               else
+                 echo "✅ Role already assigned. Skipping."
+               fi
 
-              echo "🔄 Checking if Managed Prometheus is enabled..."
-              if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.azureMonitorProfile.enabled" -o tsv | grep -q "true"; then
-                echo "✅ Managed Prometheus is already enabled. Skipping."
-              else
-                echo "🔄 Enabling Managed Prometheus..."
-                az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
-                echo "✅ Managed Prometheus enabled successfully!"
-              fi
-            displayName: 'Enable Prometheus'
+               echo "🔄 Ensuring 'Owner' role is assigned to Service Principal on Resource Group..."
+               az role assignment create --assignee $(azure_client_id) --role "Owner" --scope /subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)
 
-  - stage: DeployPrometheus
-    displayName: 'Deploy Prometheus'
-    jobs:
-      - job: DeployPrometheus
-        steps:
-          - script: |
-              set -e
-              echo "🔑 Logging into Azure again to ensure the session is valid..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
+               echo "🔄 Checking if Managed Prometheus is enabled..."
+               if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.azureMonitorProfile.enabled" -o tsv | grep -q "true"; then
+                 echo "✅ Managed Prometheus is already enabled. Skipping."
+               else
+                 echo "🔄 Enabling Managed Prometheus..."
+                 az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
+                 echo "✅ Managed Prometheus enabled successfully!"
+               fi
+             displayName: 'Enable Prometheus'
 
-              echo "🔄 Setting AKS context..."
-              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name) --overwrite-existing
+   - stage: DeployPrometheus
+     displayName: 'Deploy Prometheus'
+     jobs:
+       - job: DeployPrometheus
+         steps:
+           - script: |
+               set -e
+               echo "🔄 Setting AKS context..."
+               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name) --overwrite-existing
 
-              echo "🔄 Deploying Prometheus..."
-              cat <<EOF | kubectl apply -f -
-              apiVersion: apps/v1
-              kind: Deployment
-              metadata:
-                name: prometheus
-                namespace: monitoring
-              spec:
-                replicas: 1
-                selector:
-                  matchLabels:
-                    app: prometheus
-                template:
-                  metadata:
-                    labels:
-                      app: prometheus
-                  spec:
-                    containers:
-                    - name: prometheus
-                      image: mcr.microsoft.com/azuremonitor/containerinsights/ciprod/prometheus-remote-write/images:prom-remotewrite-20240617.1
-                      env:
-                      - name: INGESTION_URL
-                        value: "$(ingestion_url)"
-                      - name: MANAGED_IDENTITY_CLIENT_ID
-                        value: "$(azure_client_id)"
-                      - name: CLUSTER_NAME
-                        value: "$(aks_name)"
-              EOF
+               echo "🔄 Deploying Prometheus..."
+               cat <<EOF | kubectl apply -f -
+               apiVersion: apps/v1
+               kind: Deployment
+               metadata:
+                 name: prometheus
+                 namespace: monitoring
+               spec:
+                 replicas: 1
+                 selector:
+                   matchLabels:
+                     app: prometheus
+                 template:
+                   metadata:
+                     labels:
+                       app: prometheus
+                   spec:
+                     containers:
+                     - name: prometheus
+                       image: mcr.microsoft.com/azuremonitor/containerinsights/ciprod/prometheus-remote-write/images:prom-remotewrite-20240617.1
+                       env:
+                       - name: INGESTION_URL
+                         value: "$(ingestion_url)"
+                       - name: MANAGED_IDENTITY_CLIENT_ID
+                         value: "$(azure_client_id)"
+                       - name: CLUSTER_NAME
+                         value: "$(aks_name)"
+               EOF
 
-              echo "✅ Prometheus deployed successfully!"
-            displayName: 'Deploy Prometheus'
+               echo "✅ Prometheus deployed successfully!"
+             displayName: 'Deploy Prometheus'
