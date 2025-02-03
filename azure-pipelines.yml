@@ -13,12 +13,13 @@ variables:
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
   monitor_workspace: "defaultazuremonitorworkspace-eus"
+  grafana_name: "goreg4-grafana"
 
 stages:
-  - stage: EnableMonitoring
-    displayName: 'Enable Monitoring & Prometheus in AKS'
+  - stage: EnableMetricsCollection
+    displayName: 'Enable Metrics Collection for AKS Cluster'
     jobs:
-      - job: EnableMonitoring
+      - job: EnableMetricsCollection
         steps:
           - script: |
               set -e
@@ -28,7 +29,6 @@ stages:
 
               echo "🔍 Checking if Azure Monitor (omsagent) is enabled..."
               MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
-
               if [[ "$MONITOR_STATUS" != "true" ]]; then
                 echo "🔄 Enabling Azure Monitor for AKS..."
                 az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
@@ -50,17 +50,22 @@ stages:
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
               echo "✅ Managed Prometheus enabled successfully!"
 
-              echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
-              az monitor grafana create --resource-group $(resource_group_name) --name goreg4-grafana --location $(location)
+              echo "🔄 Installing Grafana extension if not installed..."
+              if ! az extension list -o tsv | grep -q "grafana"; then
+                az extension add --name grafana
+              fi
+
+              echo "🔄 Creating Managed Grafana instance..."
+              az grafana create --resource-group $(resource_group_name) --name $(grafana_name) --location $(location)
               echo "✅ Managed Grafana enabled successfully for Prometheus visualizations."
 
-              echo "🔄 Enabling Prometheus Recording Rules..."
+              echo "🔄 Enabling Prometheus Recording Rules via Metric Alert..."
               az monitor metrics alert create \
                 --name PrometheusRecordingRules \
                 --resource-group $(resource_group_name) \
                 --scopes "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
                 --condition "count PromQL('up{job=\"kubernetes-nodes\"}') > 0" \
-                --description "Enable Prometheus Recording Rules for AKS" \
+                --description "Prometheus Recording Rules for AKS" \
                 --severity 3
               echo "✅ Prometheus recording rules enabled successfully."
             displayName: 'Enable Azure Monitor, Managed Prometheus, Grafana, and Recording Rules'
