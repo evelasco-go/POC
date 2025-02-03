@@ -13,6 +13,7 @@ variables:
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
   monitor_workspace: "defaultazuremonitorworkspace-eus"
+  grafana_name: "goreg4-grafana"
 
 stages:
   - stage: EnableMetricsCollection
@@ -48,11 +49,13 @@ stages:
 
               echo "🔄 Enabling Managed Prometheus..."
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
-
               echo "✅ Managed Prometheus enabled successfully!"
 
-              echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
-              az monitor metrics-advisor create --resource-group $(resource_group_name) --workspace $(monitor_workspace) --name grafana --location $(location)
+              echo "🔄 Registering Microsoft.Dashboard provider..."
+              az provider register --namespace Microsoft.Dashboard
+
+              echo "🔄 Creating Managed Grafana..."
+              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
               echo "✅ Managed Grafana enabled successfully for Prometheus visualizations."
 
               echo "🔄 Enabling Prometheus Recording Rules..."
