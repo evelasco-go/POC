@@ -5,36 +5,42 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azure_subscription_id: "your_subscription_id"
-  azure_client_id: "your_client_id"
-  azure_client_secret: "your_client_secret"
-  azure_tenant_id: "your_tenant_id"
+  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
+  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
   location: "eastus"
-  resource_group_name: "your_resource_group"
-  aks_name: "your_aks_cluster"
-  monitor_workspace: "your_monitor_workspace"
+  resource_group_name: "Goreg4"
+  aks_name: "goreg4-aks"
+  monitor_workspace: "defaultazuremonitorworkspace-eus"
 
 stages:
-  - stage: EnableMetricsCollection
-    displayName: 'Enable Metrics Collection for AKS Cluster'
+  - stage: EnablePrometheus
+    displayName: 'Enable Prometheus and Recording Rules'
     jobs:
-      - job: EnableMetricsCollection
+      - job: EnablePrometheus
         steps:
           - script: |
+              set -e
               echo "🔑 Logging into Azure..."
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
+              echo "🔄 Enabling Azure Monitor for AKS..."
+              MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
+
+              if [[ "$MONITOR_STATUS" != "true" ]]; then
+                echo "🔄 Enabling Azure Monitor for AKS..."
+                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+              else
+                echo "✅ Azure Monitor is already enabled."
+              fi
+
               echo "🔄 Enabling Managed Prometheus..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-managed-prometheus
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
 
-              echo "🔄 Enabling Managed Prometheus Visualizations..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+              echo "🔄 Enabling Recording Rules for Prometheus..."
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-recording-rules
 
-              echo "✅ Managed Prometheus and visualizations enabled successfully!"
-
-              echo "🔄 Enabling Prometheus Recording Rules..."
-              # The recording rules are enabled via Prometheus setup or Azure Monitor
-              # Ensure that Prometheus recording rules are configured in your Prometheus setup
-              echo "✅ Prometheus recording rules setup completed."
-            displayName: 'Enable Azure Monitor, Managed Prometheus, and Recording Rules'
+              echo "✅ Managed Prometheus and Recording Rules enabled successfully!"
+            displayName: 'Enable Prometheus and Recording Rules'
