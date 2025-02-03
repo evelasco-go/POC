@@ -13,13 +13,12 @@ variables:
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
   monitor_workspace: "defaultazuremonitorworkspace-eus"
-  grafana_name: "goreg4-grafana"
 
 stages:
-  - stage: EnableMetricsCollection
-    displayName: 'Enable Metrics Collection for AKS Cluster'
+  - stage: EnableMonitoring
+    displayName: 'Enable Monitoring & Prometheus in AKS'
     jobs:
-      - job: EnableMetricsCollection
+      - job: EnableMonitoring
         steps:
           - script: |
               set -e
@@ -51,14 +50,17 @@ stages:
               az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
               echo "✅ Managed Prometheus enabled successfully!"
 
-              echo "🔄 Registering Microsoft.Dashboard provider..."
-              az provider register --namespace Microsoft.Dashboard
-
-              echo "🔄 Creating Managed Grafana..."
-              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
+              az monitor grafana create --resource-group $(resource_group_name) --name goreg4-grafana --location $(location)
               echo "✅ Managed Grafana enabled successfully for Prometheus visualizations."
 
               echo "🔄 Enabling Prometheus Recording Rules..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-recording-rules
+              az monitor metrics alert create \
+                --name PrometheusRecordingRules \
+                --resource-group $(resource_group_name) \
+                --scopes "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+                --condition "count PromQL('up{job=\"kubernetes-nodes\"}') > 0" \
+                --description "Enable Prometheus Recording Rules for AKS" \
+                --severity 3
               echo "✅ Prometheus recording rules enabled successfully."
             displayName: 'Enable Azure Monitor, Managed Prometheus, Grafana, and Recording Rules'
