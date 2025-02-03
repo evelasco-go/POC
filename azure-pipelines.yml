@@ -30,8 +30,15 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔄 Enabling Azure Monitor for AKS..."
-              az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+              echo "🔄 Checking if Azure Monitor is already enabled..."
+              MONITOR_STATUS=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.omsagent.enabled" -o tsv || echo "false")
+
+              if [[ "$MONITOR_STATUS" != "true" ]]; then
+                echo "🔄 Enabling Azure Monitor for AKS..."
+                az aks enable-addons --addons monitoring --resource-group $(resource_group_name) --name $(aks_name) --workspace-resource-id "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.OperationalInsights/workspaces/$(monitor_workspace)"
+              else
+                echo "✅ Azure Monitor is already enabled."
+              fi
 
               echo "🔄 Installing k8s-extension if not installed..."
               if ! az extension list -o tsv | grep -q "k8s-extension"; then
@@ -43,6 +50,7 @@ stages:
 
               echo "✅ Managed Prometheus enabled successfully!"
             displayName: 'Enable Prometheus'
+
 
   - stage: DeployPrometheus
     displayName: 'Deploy Prometheus'
