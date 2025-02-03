@@ -51,16 +51,7 @@ stages:
 
               echo "✅ Managed Prometheus enabled successfully!"
 
-              echo "🔄 Installing Grafana extension if not installed..."
-              if ! az extension list -o tsv | grep -q "grafana"; then
-                az extension add --name grafana
-              fi
-
-              echo "🔄 Enabling Managed Grafana for Prometheus Visualizations..."
-              az grafana create --resource-group $(resource_group_name) --name $(aks_name)-grafana
-              echo "✅ Managed Grafana enabled successfully for Prometheus visualizations."
-
               echo "🔄 Enabling Prometheus Recording Rules..."
-              # No explicit command for "recording rules" exists in Azure CLI; ensure Prometheus is enabled
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-recording-rules
               echo "✅ Prometheus recording rules enabled successfully."
-            displayName: 'Enable Azure Monitor, Managed Prometheus, Grafana, and Recording Rules'
+            displayName: 'Enable Azure Monitor and Managed Prometheus'
