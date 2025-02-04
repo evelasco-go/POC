@@ -13,7 +13,6 @@ variables:
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
   dcr_name: "PrometheusDCR"
-  ingestion_url: "https://defaultazuremonitorworkspace-eastus-964j.eastus-1.metrics.ingest.monitor.azure.com/dataCollectionRules/dcr-57a879c781d44ab38afebcb72da1944e/streams/Microsoft-PrometheusMetrics/api/v1/write?api-version=2023-04-24"
 
 stages:
   - stage: EnablePrometheus
@@ -37,6 +36,10 @@ stages:
       - job: ConfigureDCR
         steps:
           - script: |
+              echo "🔑 Logging into Azure..."
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+
               echo "🔄 Checking if Data Collection Rule (DCR) exists..."
               DCR_EXISTS=$(az monitor data-collection rule show --name $(dcr_name) --resource-group $(resource_group_name) --query "name" -o tsv || echo "not_found")
 
@@ -47,7 +50,7 @@ stages:
                   --resource-group $(resource_group_name) \
                   --location $(location) \
                   --data-flows '[{"streams": ["Microsoft-PrometheusMetrics"], "destinations": ["azure-monitor-metrics"]}]' \
-                  --destinations '[{"name": "azure-monitor-metrics", "type": "azure-monitor-metrics"}]'
+                  --destinations name=azure-monitor-metrics type=azure-monitor-metrics
                 
                 echo "✅ Data Collection Rule (DCR) created successfully!"
               else
@@ -61,6 +64,10 @@ stages:
       - job: EnableRecordingRules
         steps:
           - script: |
+              echo "🔑 Logging into Azure..."
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+
               echo "🔄 Checking if Recording Rules are enabled..."
               RECORDING_RULES_ENABLED=$(az monitor metrics alert list --resource-group $(resource_group_name) --query "[?name=='PrometheusRecordingRules'].name" -o tsv || echo "not_found")
 
@@ -78,51 +85,3 @@ stages:
                 echo "✅ Recording Rules already configured. Skipping."
               fi
             displayName: 'Enable Prometheus Recording Rules'
-
-  - stage: DeployPrometheus
-    displayName: 'Deploy Prometheus to AKS'
-    jobs:
-      - job: DeployPrometheus
-        steps:
-          - script: |
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
-
-              echo "🔄 Setting AKS context..."
-              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name) --overwrite-existing
-
-              echo "🔄 Ensuring monitoring namespace exists..."
-              kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-
-              echo "🔄 Deploying Prometheus..."
-              cat <<EOF | kubectl apply -f -
-              apiVersion: apps/v1
-              kind: Deployment
-              metadata:
-                name: prometheus
-                namespace: monitoring
-              spec:
-                replicas: 1
-                selector:
-                  matchLabels:
-                    app: prometheus
-                template:
-                  metadata:
-                    labels:
-                      app: prometheus
-                  spec:
-                    containers:
-                    - name: prometheus
-                      image: mcr.microsoft.com/azuremonitor/containerinsights/ciprod/prometheus-remote-write/images:prom-remotewrite-20240617.1
-                      env:
-                      - name: INGESTION_URL
-                        value: "$(ingestion_url)"
-                      - name: MANAGED_IDENTITY_CLIENT_ID
-                        value: "$(azure_client_id)"
-                      - name: CLUSTER_NAME
-                        value: "$(aks_name)"
-              EOF
-
-              echo "✅ Prometheus deployed successfully!"
-            displayName: 'Deploy Prometheus to AKS'
