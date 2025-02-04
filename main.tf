@@ -1,30 +1,35 @@
 
+variable "dcr_name" {
+  description = "The name of the Data Collection Rule"
+  type        = string
+  default     = "PrometheusDCR"  # Or use any other default value
+}
 
 # ✅ Enable Azure Monitor Managed Prometheus on AKS
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.aks_name
   location            = var.location
   resource_group_name = var.resource_group_name
-  dns_prefix          = "goreg4aks"
+  dns_prefix          = "aks"
 
   default_node_pool {
     name       = "default"
-    node_count = 2
-    vm_size    = "Standard_D2s_v3"
+    node_count = var.node_count
+    vm_size    = "Standard_DS2_v2"
   }
 
   identity {
     type = "SystemAssigned"
   }
 
-  oms_agent {
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.monitor.id
-  }
-
-  azure_monitor_metrics {
-    enabled = true
+  addon_profile {
+    oms_agent {
+      enabled                    = true
+      log_analytics_workspace_id = azurerm_log_analytics_workspace.workspace.id
+    }
   }
 }
+
 
 # ✅ Create a Log Analytics Workspace for Monitoring
 resource "azurerm_log_analytics_workspace" "monitor" {
