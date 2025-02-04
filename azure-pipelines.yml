@@ -42,7 +42,7 @@ stages:
                   --resource-group $(resource_group_name) \
                   --location $(location) \
                   --data-flows "[{\"streams\": [\"Microsoft-PrometheusMetrics\"], \"destinations\": [\"azure-monitor-metrics\"]}]" \
-                  --destinations "{\"name\": \"azure-monitor-metrics\", \"type\": \"azure-monitor-metrics\"}"
+                  --destinations "[{\"type\": \"azure-monitor-metrics\"}]"
 
                 if [ $? -eq 0 ]; then
                   echo "✅ Created DCR: $(dcr_name)"
@@ -71,6 +71,7 @@ stages:
 
               echo "✅ Managed Prometheus with Recording Rules enabled successfully!"
             displayName: 'Enable Prometheus & Recording Rules'
+
 
 
   - stage: DeployPrometheus
