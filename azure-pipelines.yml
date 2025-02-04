@@ -1,13 +1,23 @@
 trigger:
-- main  # Change this to match your branch
+- main  # Change this to your branch if needed
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  terraformVersion: '1.5.0'  # Adjust as needed
-  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
-  workingDirectory: 'terraform'  # Path to your Terraform configuration files
+  terraformVersion: '1.3.5'
+  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Service Connection Name
+  location: "East US"
+  node_count: 2
+  log_analytics_sku: "PerGB2018"
+
+  resource_group_name: "Goreg4"
+  storage_account_name: "goreg4"
+  container_name: "goreg4container"
+  aks_name: "goreg4-aks"
+  log_analytics_workspace_name: "goreg4-analytics"
+  diagnostic_setting_name: "goreg4-diagnostics"
+  dcr_name: "PrometheusDCR"
 
 stages:
 - stage: Terraform_Deploy
@@ -16,19 +26,15 @@ stages:
   - job: Terraform
     displayName: "Run Terraform"
     steps:
-    
+
     # ✅ Checkout the repository
     - checkout: self
-    
-    # ✅ Ensure Terraform is installed
+
+    # ✅ Install Terraform
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: $(terraformVersion)
-
-    # ✅ Verify Terraform Installation
-    - script: terraform version
-      displayName: "Check Terraform Installation"
 
     # ✅ Authenticate to Azure
     - task: AzureCLI@2
@@ -38,20 +44,19 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
-          az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-          az account set --subscription $(azureSubscription)
+          az login --identity || az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
 
     # ✅ Terraform Init
     - task: TerraformTaskV2@2
       displayName: "Terraform Init"
       inputs:
         command: 'init'
-        workingDirectory: $(workingDirectory)
+        workingDirectory: 'terraform'
         backendType: 'azurerm'
         backendServiceArm: $(azureSubscription)
-        backendAzureRmResourceGroupName: 'Goreg4'
-        backendAzureRmStorageAccountName: 'yourstorageaccount'
-        backendAzureRmContainerName: 'terraform-state'
+        backendAzureRmResourceGroupName: $(resource_group_name)
+        backendAzureRmStorageAccountName: $(storage_account_name)
+        backendAzureRmContainerName: $(container_name)
         backendAzureRmKey: 'terraform.tfstate'
 
     # ✅ Terraform Plan
@@ -59,7 +64,7 @@ stages:
       displayName: "Terraform Plan"
       inputs:
         command: 'plan'
-        workingDirectory: $(workingDirectory)
+        workingDirectory: 'terraform'
         environmentServiceNameAzureRM: $(azureSubscription)
 
     # ✅ Terraform Apply (Auto Approve)
@@ -67,6 +72,49 @@ stages:
       displayName: "Terraform Apply"
       inputs:
         command: 'apply'
-        workingDirectory: $(workingDirectory)
+        workingDirectory: 'terraform'
         environmentServiceNameAzureRM: $(azureSubscription)
         commandOptions: '-auto-approve'
+
+    # ✅ Enable Managed Prometheus
+    - task: AzureCLI@2
+      displayName: "Enable Managed Prometheus"
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az monitor metrics alert create --name "PrometheusAlert" \
+          --resource-group $(resource_group_name) \
+          --scopes "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+          --condition "count Metrics.Namespace.value > 0" \
+          --description "Alert when Prometheus is active" \
+          --action-group "YourActionGroup"
+
+    # ✅ Create Data Collection Rule (DCR)
+    - task: AzureCLI@2
+      displayName: "Create Data Collection Rule (DCR)"
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az monitor data-collection rule create \
+          --resource-group $(resource_group_name) \
+          --name $(dcr_name) \
+          --location $(location) \
+          --description "Data Collection Rule for Prometheus"
+
+    # ✅ Enable Prometheus Recording Rules
+    - task: AzureCLI@2
+      displayName: "Enable Prometheus Recording Rules"
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az monitor metrics alert create --name "PrometheusRecordingRules" \
+          --resource-group $(resource_group_name) \
+          --scopes "/subscriptions/$(azureSubscription)/resourceGroups/$(resource_group_name)/providers/Microsoft.ContainerService/managedClusters/$(aks_name)" \
+          --condition "count Metrics.Prometheus.value > 0" \
+          --description "Recording Rules enabled for Prometheus"
