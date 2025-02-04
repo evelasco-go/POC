@@ -1,26 +1,4 @@
-provider "azurerm" {
-  features {}
-}
 
-variable "resource_group_name" {
-  default = "Goreg4"
-}
-
-variable "aks_name" {
-  default = "goreg4-aks"
-}
-
-variable "location" {
-  default = "eastus"
-}
-
-variable "dcr_name" {
-  default = "PrometheusDCR"
-}
-
-variable "subscription_id" {
-  default = "15e60859-88d7-4c84-943f-55488479910c"
-}
 
 # ✅ Enable Azure Monitor Managed Prometheus on AKS
 resource "azurerm_kubernetes_cluster" "aks" {
