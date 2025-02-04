@@ -17,7 +17,7 @@ variables:
 
 stages:
   - stage: EnablePrometheus
-    displayName: 'Enable Prometheus'
+    displayName: 'Enable Managed Prometheus'
     jobs:
       - job: EnablePrometheus
         steps:
@@ -35,24 +35,20 @@ stages:
                 echo "✅ Service Principal exists."
               fi
 
-              echo "🔄 Ensuring required roles are assigned..."
-              for ROLE in "Monitoring Metrics Publisher" "Monitoring Contributor" "Owner"; do
-                if ! az role assignment list --assignee $(azure_client_id) --role "$ROLE" --query "[].roleDefinitionName" -o tsv | grep -q "$ROLE"; then
-                  echo "🔄 Assigning '$ROLE' Role..."
-                  az role assignment create --assignee $(azure_client_id) --role "$ROLE" --scope /subscriptions/$(azure_subscription_id)
-                else
-                  echo "✅ Role '$ROLE' already assigned. Skipping."
-                fi
-              done
+              echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
+              az role assignment create --assignee $(azure_client_id) \
+                --role "Monitoring Metrics Publisher" \
+                --scope /subscriptions/$(azure_subscription_id)
+
+              echo "🔄 Ensuring 'Owner' role is assigned..."
+              az role assignment create --assignee $(azure_client_id) --role "Owner" --scope /subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)
 
               echo "🔄 Checking if Managed Prometheus is enabled..."
-              IS_ENABLED=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.azureMonitorProfile.enabled" -o tsv || echo "false")
-              if [ "$IS_ENABLED" = "true" ]; then
+              if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.azureMonitorProfile.enabled" -o tsv | grep -q "true"; then
                 echo "✅ Managed Prometheus is already enabled."
               else
                 echo "🔄 Enabling Managed Prometheus..."
                 az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
-                sleep 30  # Give Azure time to update the settings
                 echo "✅ Managed Prometheus enabled successfully!"
               fi
 
@@ -65,11 +61,10 @@ stages:
                 --window-size 5m \
                 --evaluation-frequency 1m \
                 --description "Enable Prometheus recording rules for better visualization" \
-                --severity 3 \
-                --action-group ""
+                --severity 3
 
               echo "✅ Managed Prometheus with Recording Rules enabled successfully!"
-            displayName: 'Enable Managed Prometheus'
+            displayName: 'Enable Prometheus & Recording Rules'
 
   - stage: DeployPrometheus
     displayName: 'Deploy Prometheus'
