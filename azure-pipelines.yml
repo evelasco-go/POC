@@ -41,9 +41,9 @@ stages:
                 az monitor data-collection rule create --name $(dcr_name) \
                   --resource-group $(resource_group_name) \
                   --location $(location) \
-                  --data-flows '[{"streams": ["Microsoft-PrometheusMetrics"], "destinations": ["azure-monitor-metrics"]}]' \
-                  --destinations '[{"name": "azure-monitor-metrics", "type": "azure-monitor-metrics"}]'
-                
+                  --data-flows "[{\"streams\": [\"Microsoft-PrometheusMetrics\"], \"destinations\": [\"azure-monitor-metrics\"]}]" \
+                  --destinations "{\"name\": \"azure-monitor-metrics\", \"type\": \"azure-monitor-metrics\"}"
+
                 if [ $? -eq 0 ]; then
                   echo "✅ Created DCR: $(dcr_name)"
                 else
@@ -71,6 +71,7 @@ stages:
 
               echo "✅ Managed Prometheus with Recording Rules enabled successfully!"
             displayName: 'Enable Prometheus & Recording Rules'
+
 
   - stage: DeployPrometheus
     displayName: 'Deploy Prometheus on AKS'
