@@ -1,8 +1,41 @@
+# Define Variables
+variable "aks_name" {
+  description = "The name of the AKS cluster"
+  type        = string
+  default     = "goreg4-aks"
+}
+
+variable "location" {
+  description = "The Azure region where resources will be deployed"
+  type        = string
+  default     = "East US"
+}
+
+variable "resource_group_name" {
+  description = "The name of the resource group"
+  type        = string
+  default     = "Goreg4"
+}
+
+variable "node_count" {
+  description = "The number of nodes in the AKS cluster"
+  type        = number
+  default     = 2
+}
 
 variable "dcr_name" {
   description = "The name of the Data Collection Rule"
   type        = string
-  default     = "PrometheusDCR"  # Or use any other default value
+  default     = "PrometheusDCR"
+}
+
+# ✅ Create a Log Analytics Workspace for Monitoring
+resource "azurerm_log_analytics_workspace" "workspace" {
+  name                = "goreg4-monitor-workspace"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
 }
 
 # ✅ Enable Azure Monitor Managed Prometheus on AKS
@@ -22,22 +55,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
-  addon_profile {
-    oms_agent {
-      enabled                    = true
-      log_analytics_workspace_id = azurerm_log_analytics_workspace.workspace.id
-    }
+  enable_azure_monitor = true  # Enables monitoring for AKS
+  azure_monitor {
+    enabled = true
+    log_analytics_workspace_id = azurerm_log_analytics_workspace.workspace.id
   }
-}
-
-
-# ✅ Create a Log Analytics Workspace for Monitoring
-resource "azurerm_log_analytics_workspace" "monitor" {
-  name                = "goreg4-monitor-workspace"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  sku                 = "PerGB2018"
-  retention_in_days   = 30
 }
 
 # ✅ Create a Data Collection Rule (DCR) for Prometheus Metrics
