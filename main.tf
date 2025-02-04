@@ -1,27 +1,4 @@
-# Define Variables
-variable "aks_name" {
-  description = "The name of the AKS cluster"
-  type        = string
-  default     = "goreg4-aks"
-}
 
-variable "location" {
-  description = "The Azure region where resources will be deployed"
-  type        = string
-  default     = "East US"
-}
-
-variable "resource_group_name" {
-  description = "The name of the resource group"
-  type        = string
-  default     = "Goreg4"
-}
-
-variable "node_count" {
-  description = "The number of nodes in the AKS cluster"
-  type        = number
-  default     = 2
-}
 
 variable "dcr_name" {
   description = "The name of the Data Collection Rule"
