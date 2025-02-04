@@ -1,97 +1,83 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source = "hashicorp/azurerm"
-      version = "~> 3.0"  # Specify a version here
-    }
-    random = {
-      source = "hashicorp/random"
-      version = "~> 3.0"  # Specify a version here
-    }
-  }
-}
-
-# Provider configuration for Azure
 provider "azurerm" {
   features {}
-  client_id       = var.azure_client_id
-  client_secret   = var.azure_client_secret
-  tenant_id       = var.azure_tenant_id
-  subscription_id = var.azure_subscription_id
 }
 
-# Provider configuration for random ID generation
-provider "random" {}
-
-
-# Resource group
-resource "azurerm_resource_group" "example" {
-  name     = var.resource_group_name
-  location = var.location
+variable "resource_group_name" {
+  default = "Goreg4"
 }
 
-# Azure Kubernetes Service Cluster
-resource "azurerm_kubernetes_cluster" "example" {
+variable "aks_name" {
+  default = "goreg4-aks"
+}
+
+variable "location" {
+  default = "eastus"
+}
+
+variable "dcr_name" {
+  default = "PrometheusDCR"
+}
+
+variable "subscription_id" {
+  default = "15e60859-88d7-4c84-943f-55488479910c"
+}
+
+# ✅ Enable Azure Monitor Managed Prometheus on AKS
+resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.aks_name
   location            = var.location
-  resource_group_name = azurerm_resource_group.example.name
-  dns_prefix          = "aks-cluster"
+  resource_group_name = var.resource_group_name
+  dns_prefix          = "goreg4aks"
 
   default_node_pool {
     name       = "default"
-    node_count = var.node_count
-    vm_size    = "Standard_DS2_v2"
+    node_count = 2
+    vm_size    = "Standard_D2s_v3"
   }
 
   identity {
     type = "SystemAssigned"
   }
-}
 
-# Output kubeconfig (sensitive)
-output "kubeconfig" {
-  value     = azurerm_kubernetes_cluster.example.kube_config
-  sensitive = true
-}
+  oms_agent {
+    log_analytics_workspace_id = azurerm_log_analytics_workspace.monitor.id
+  }
 
-
-# Azure Storage Account
-resource "azurerm_storage_account" "example" {
-  name                     = var.storage_account_name
-  resource_group_name       = var.resource_group_name
-  location                 = var.location
-  account_tier              = "Standard"
-  account_replication_type = "LRS"
-}
-
-# Storage Container Resource
-resource "azurerm_storage_container" "example" {
-  name                  = var.container_name
-  storage_account_name  = var.storage_account_name
-  container_access_type = "private"
-  lifecycle {
-    prevent_destroy = true
+  azure_monitor_metrics {
+    enabled = true
   }
 }
 
-
-# Log Analytics Workspace Resource
-resource "azurerm_log_analytics_workspace" "example" {
-  name                = var.log_analytics_workspace_name
+# ✅ Create a Log Analytics Workspace for Monitoring
+resource "azurerm_log_analytics_workspace" "monitor" {
+  name                = "goreg4-monitor-workspace"
   location            = var.location
-  resource_group_name = azurerm_resource_group.example.name
-  sku                 = var.log_analytics_sku
+  resource_group_name = var.resource_group_name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
 }
 
-# Monitor Diagnostic Setting Resource for AKS
-resource "azurerm_monitor_diagnostic_setting" "example" {
-  name               = var.diagnostic_setting_name
-  target_resource_id = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
+# ✅ Create a Data Collection Rule (DCR) for Prometheus Metrics
+resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
+  name                = var.dcr_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
 
-  metric {
-    category = "AllMetrics"
-    enabled  = true
+  destinations {
+    azure_monitor_metrics {
+      name = "prometheus-metrics"
+    }
   }
 
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
+  data_flow {
+    streams      = ["Microsoft-PrometheusMetrics"]
+    destinations = ["prometheus-metrics"]
+  }
+}
+
+# ✅ Attach the DCR to the AKS Cluster
+resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
+  name                    = "aks-prometheus-dcr"
+  target_resource_id      = azurerm_kubernetes_cluster.aks.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus_dcr.id
 }
