@@ -14,6 +14,8 @@ variables:
   aks_name: "goreg4-aks"
   monitor_workspace: "defaultazuremonitorworkspace-eus"
   ingestion_url: "https://defaultazuremonitorworkspace-eastus-964j.eastus-1.metrics.ingest.monitor.azure.com/dataCollectionRules/dcr-57a879c781d44ab38afebcb72da1944e/streams/Microsoft-PrometheusMetrics/api/v1/write?api-version=2023-04-24"
+  dcr_name: "PrometheusDCR"
+  dcr_id: "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Insights/dataCollectionRules/PrometheusDCR"
 
 stages:
   - stage: EnablePrometheus
@@ -26,53 +28,41 @@ stages:
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              echo "🔍 Checking if Service Principal exists..."
-              SP_EXISTS=$(az ad sp show --id $(azure_client_id) --query "appId" -o tsv || echo "not_found")
-              if [ "$SP_EXISTS" = "not_found" ]; then
-                echo "❌ ERROR: Service Principal not found! Please verify the Client ID."
-                exit 1
+              echo "🔄 Checking if Managed Prometheus is enabled..."
+              if az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.azureMonitorProfile.enabled" -o tsv | grep -q "true"; then
+                echo "✅ Managed Prometheus is already enabled. Skipping."
               else
-                echo "✅ Service Principal exists."
+                echo "🔄 Enabling Managed Prometheus..."
+                az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
+                echo "✅ Managed Prometheus enabled successfully!"
               fi
 
-              echo "🔄 Assigning required roles..."
-              # Assign "Monitoring Metrics Publisher" role if not already assigned
-              if ! az role assignment list --assignee $(azure_client_id) --role "Monitoring Metrics Publisher" --query "[].roleDefinitionName" -o tsv | grep -q "Monitoring Metrics Publisher"; then
-                echo "🔄 Assigning 'Monitoring Metrics Publisher' Role..."
-                az role assignment create --assignee $(azure_client_id) --role "Monitoring Metrics Publisher" --scope /subscriptions/$(azure_subscription_id)
-              else
-                echo "✅ 'Monitoring Metrics Publisher' Role already assigned."
-              fi
-
-              # Ensure "Owner" role on the resource group is assigned
-              az role assignment create --assignee $(azure_client_id) --role "Owner" --scope /subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)
-
-              echo "🔄 Enabling Managed Prometheus on AKS..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
-              echo "✅ Managed Prometheus enabled successfully!"
-
-              echo "🔄 Creating/Updating Data Collection Rule (DCR) for Prometheus Recording Rules..."
-              DCR_ID=$(az monitor data-collection rule list --resource-group $(resource_group_name) --query "[?name=='prometheus-dcr'].id" -o tsv)
-              if [ -z "$DCR_ID" ]; then
-                echo "🔄 Creating new DCR for Prometheus..."
-                DCR_ID=$(az monitor data-collection rule create \
+              echo "🔄 Checking if Data Collection Rule (DCR) exists..."
+              if ! az monitor data-collection rule show --name $(dcr_name) --resource-group $(resource_group_name) &>/dev/null; then
+                echo "🔄 Creating new Data Collection Rule (DCR) for Prometheus..."
+                az monitor data-collection rule create --name $(dcr_name) \
                   --resource-group $(resource_group_name) \
-                  --name prometheus-dcr \
                   --location $(location) \
-                  --description "Prometheus Recording Rules for AKS Monitoring" \
-                  --data-flows '[{"streams": ["Microsoft-PrometheusMetrics"], "destinations": [{"name": "azureMonitorMetricsDestination"}]}]' \
-                  --data-sources '[{"type": "prometheusMetrics", "name": "recording_rules", "enabled": true}]' \
-                  --query "id" -o tsv)
-                echo "✅ Created DCR: $DCR_ID"
+                  --kind PrometheusMetrics \
+                  --data-flows destination:azure-monitor-metrics
+                echo "✅ Created DCR: $(dcr_name)"
               else
-                echo "✅ DCR already exists: $DCR_ID"
+                echo "✅ DCR already exists."
               fi
 
+              echo "🔄 Configuring Prometheus Recording Rules..."
+              az monitor metrics alert create --name "PrometheusRecordingRules" \
+                --resource-group $(resource_group_name) \
+                --scopes $(dcr_id) \
+                --condition "max AzureMonitorPrometheusRecordingRule > 90" \
+                --window-size 5m \
+                --evaluation-frequency 1m \
+                --description "Enables Prometheus recording rules for better visualizations."
               echo "✅ Managed Prometheus with Recording Rules enabled successfully!"
             displayName: 'Enable Prometheus & Recording Rules'
 
   - stage: DeployPrometheus
-    displayName: 'Deploy Prometheus'
+    displayName: 'Deploy Prometheus on AKS'
     jobs:
       - job: DeployPrometheus
         steps:
@@ -85,7 +75,7 @@ stages:
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name) --overwrite-existing
 
               echo "🔄 Ensuring 'monitoring' namespace exists..."
-              kubectl create namespace monitoring || echo "Namespace 'monitoring' already exists."
+              kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
               echo "🔄 Deploying Prometheus..."
               cat <<EOF | kubectl apply -f -
@@ -117,4 +107,4 @@ stages:
               EOF
 
               echo "✅ Prometheus deployed successfully!"
-            displayName: 'Deploy Prometheus'
+            displayName: 'Deploy Prometheus on AKS'
