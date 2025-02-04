@@ -12,8 +12,6 @@ variables:
   location: "eastus"
   resource_group_name: "Goreg4"
   aks_name: "goreg4-aks"
-  monitor_workspace: "defaultazuremonitorworkspace-eus"
-  ingestion_url: "https://defaultazuremonitorworkspace-eastus-964j.eastus-1.metrics.ingest.monitor.azure.com/dataCollectionRules/dcr-57a879c781d44ab38afebcb72da1944e/streams/Microsoft-PrometheusMetrics/api/v1/write?api-version=2023-04-24"
   dcr_name: "PrometheusDCR"
   dcr_id: "/subscriptions/15e60859-88d7-4c84-943f-55488479910c/resourceGroups/Goreg4/providers/Microsoft.Insights/dataCollectionRules/PrometheusDCR"
 
@@ -43,11 +41,23 @@ stages:
                 az monitor data-collection rule create --name $(dcr_name) \
                   --resource-group $(resource_group_name) \
                   --location $(location) \
-                  --kind PrometheusMetrics \
-                  --data-flows destination:azure-monitor-metrics
-                echo "✅ Created DCR: $(dcr_name)"
+                  --data-flows '[{"streams": ["Microsoft-PrometheusMetrics"], "destinations": ["azure-monitor-metrics"]}]' \
+                  --destinations '[{"name": "azure-monitor-metrics", "type": "azure-monitor-metrics"}]'
+                
+                if [ $? -eq 0 ]; then
+                  echo "✅ Created DCR: $(dcr_name)"
+                else
+                  echo "❌ Failed to create DCR. Exiting."
+                  exit 1
+                fi
               else
                 echo "✅ DCR already exists."
+              fi
+
+              echo "🔄 Verifying if Data Collection Rule (DCR) exists before configuring Prometheus Recording Rules..."
+              if ! az monitor data-collection rule show --name $(dcr_name) --resource-group $(resource_group_name) &>/dev/null; then
+                echo "❌ Data Collection Rule (DCR) was not found. Exiting."
+                exit 1
               fi
 
               echo "🔄 Configuring Prometheus Recording Rules..."
@@ -58,6 +68,7 @@ stages:
                 --window-size 5m \
                 --evaluation-frequency 1m \
                 --description "Enables Prometheus recording rules for better visualizations."
+
               echo "✅ Managed Prometheus with Recording Rules enabled successfully!"
             displayName: 'Enable Prometheus & Recording Rules'
 
