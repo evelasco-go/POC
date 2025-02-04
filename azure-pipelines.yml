@@ -1,13 +1,13 @@
 trigger:
-- main  # Change to your branch if needed
+- main  # Change this to match your branch
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  terraformVersion: '1.5.0'  # Adjust version as needed
-  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Name of your Azure DevOps service connection
-  workingDirectory: 'terraform'  # Path to Terraform configuration files
+  terraformVersion: '1.5.0'  # Adjust as needed
+  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'
+  workingDirectory: 'terraform'  # Path to your Terraform configuration files
 
 stages:
 - stage: Terraform_Deploy
@@ -20,11 +20,15 @@ stages:
     # ✅ Checkout the repository
     - checkout: self
     
-    # ✅ Install Terraform
+    # ✅ Ensure Terraform is installed
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: $(terraformVersion)
+
+    # ✅ Verify Terraform Installation
+    - script: terraform version
+      displayName: "Check Terraform Installation"
 
     # ✅ Authenticate to Azure
     - task: AzureCLI@2
@@ -34,7 +38,8 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
-          az login --identity || az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+          az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+          az account set --subscription $(azureSubscription)
 
     # ✅ Terraform Init
     - task: TerraformTaskV2@2
