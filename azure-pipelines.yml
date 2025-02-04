@@ -1,87 +1,67 @@
 trigger:
-  - dev
+- main  # Change to your branch if needed
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
-  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
-  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
-  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  location: "eastus"
-  resource_group_name: "Goreg4"
-  aks_name: "goreg4-aks"
-  dcr_name: "PrometheusDCR"
+  terraformVersion: '1.5.0'  # Adjust version as needed
+  azureSubscription: 'Software Development (15e60859-88d7-4c84-943f-55488479910c)'  # Name of your Azure DevOps service connection
+  workingDirectory: 'terraform'  # Path to Terraform configuration files
 
 stages:
-  - stage: EnablePrometheus
-    displayName: 'Enable Managed Prometheus'
-    jobs:
-      - job: EnablePrometheus
-        steps:
-          - script: |
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
+- stage: Terraform_Deploy
+  displayName: "Deploy Terraform Infrastructure"
+  jobs:
+  - job: Terraform
+    displayName: "Run Terraform"
+    steps:
+    
+    # ✅ Checkout the repository
+    - checkout: self
+    
+    # ✅ Install Terraform
+    - task: TerraformInstaller@1
+      displayName: "Install Terraform"
+      inputs:
+        terraformVersion: $(terraformVersion)
 
-              echo "🔄 Enabling Managed Prometheus..."
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
-              echo "✅ Managed Prometheus enabled successfully!"
-            displayName: 'Enable Managed Prometheus'
+    # ✅ Authenticate to Azure
+    - task: AzureCLI@2
+      displayName: "Azure Login"
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az login --identity || az login --service-principal -u $(ARM_CLIENT_ID) -p $(ARM_CLIENT_SECRET) --tenant $(ARM_TENANT_ID)
 
-  - stage: ConfigureDCR
-    displayName: 'Configure Data Collection Rule'
-    jobs:
-      - job: ConfigureDCR
-        steps:
-          - script: |
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
+    # ✅ Terraform Init
+    - task: TerraformTaskV2@2
+      displayName: "Terraform Init"
+      inputs:
+        command: 'init'
+        workingDirectory: $(workingDirectory)
+        backendType: 'azurerm'
+        backendServiceArm: $(azureSubscription)
+        backendAzureRmResourceGroupName: 'Goreg4'
+        backendAzureRmStorageAccountName: 'yourstorageaccount'
+        backendAzureRmContainerName: 'terraform-state'
+        backendAzureRmKey: 'terraform.tfstate'
 
-              echo "🔄 Checking if Data Collection Rule (DCR) exists..."
-              DCR_EXISTS=$(az monitor data-collection rule show --name $(dcr_name) --resource-group $(resource_group_name) --query "name" -o tsv || echo "not_found")
+    # ✅ Terraform Plan
+    - task: TerraformTaskV2@2
+      displayName: "Terraform Plan"
+      inputs:
+        command: 'plan'
+        workingDirectory: $(workingDirectory)
+        environmentServiceNameAzureRM: $(azureSubscription)
 
-              if [ "$DCR_EXISTS" = "not_found" ]; then
-                echo "🔄 Creating new Data Collection Rule (DCR) for Prometheus..."
-                az monitor data-collection rule create \
-                  --name $(dcr_name) \
-                  --resource-group $(resource_group_name) \
-                  --location $(location) \
-                  --data-flows '[{"streams": ["Microsoft-PrometheusMetrics"], "destinations": ["azure-monitor-metrics"]}]' \
-                  --destinations name=azure-monitor-metrics type=azure-monitor-metrics
-                
-                echo "✅ Data Collection Rule (DCR) created successfully!"
-              else
-                echo "✅ DCR already exists. Skipping creation."
-              fi
-            displayName: 'Create Data Collection Rule (DCR)'
-
-  - stage: EnableRecordingRules
-    displayName: 'Enable Prometheus Recording Rules'
-    jobs:
-      - job: EnableRecordingRules
-        steps:
-          - script: |
-              echo "🔑 Logging into Azure..."
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
-
-              echo "🔄 Checking if Recording Rules are enabled..."
-              RECORDING_RULES_ENABLED=$(az monitor metrics alert list --resource-group $(resource_group_name) --query "[?name=='PrometheusRecordingRules'].name" -o tsv || echo "not_found")
-
-              if [ "$RECORDING_RULES_ENABLED" = "not_found" ]; then
-                echo "🔄 Configuring Prometheus Recording Rules..."
-                az monitor metrics alert create \
-                  --name "PrometheusRecordingRules" \
-                  --resource-group $(resource_group_name) \
-                  --scopes "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Insights/dataCollectionRules/$(dcr_name)" \
-                  --condition "avg AzureMonitorPrometheusRecordingRule > 0" \
-                  --window-size 5m \
-                  --evaluation-frequency 1m
-                echo "✅ Prometheus Recording Rules enabled successfully!"
-              else
-                echo "✅ Recording Rules already configured. Skipping."
-              fi
-            displayName: 'Enable Prometheus Recording Rules'
+    # ✅ Terraform Apply (Auto Approve)
+    - task: TerraformTaskV2@2
+      displayName: "Terraform Apply"
+      inputs:
+        command: 'apply'
+        workingDirectory: $(workingDirectory)
+        environmentServiceNameAzureRM: $(azureSubscription)
+        commandOptions: '-auto-approve'
