@@ -13,14 +13,7 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  data_sources {
-    prometheus_scraper {
-      name            = "prometheus-scraper"
-      scrape_interval = "30s"  # Default scrape interval for Prometheus
-      scrape_url      = "http://your-prometheus-server:9090"  # Replace with your Prometheus server URL
-    }
-  }
-
+  # Define only the necessary destinations and data flow
   destinations {
     azure_monitor_metrics {
       name = "prometheus-metrics"
