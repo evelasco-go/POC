@@ -13,7 +13,13 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  # Define only the necessary destinations and data flow
+  data_sources {
+    prometheus_forwarder {
+      streams = ["Microsoft-PrometheusMetrics"]
+      name    = "prometheus-forwarder"
+    }
+  }
+
   destinations {
     azure_monitor_metrics {
       name = "prometheus-metrics"
