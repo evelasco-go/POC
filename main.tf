@@ -15,7 +15,7 @@ resource "azurerm_log_analytics_workspace" "workspace" {
   retention_in_days   = 30
 }
 
-# ✅ Enable Azure Monitor Managed Prometheus on AKS
+# ✅ Deploy AKS Cluster
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.aks_name
   location            = var.location
@@ -32,10 +32,12 @@ resource "azurerm_kubernetes_cluster" "aks" {
     type = "SystemAssigned"
   }
 
-  enable_azure_monitor = true  # Enables monitoring for AKS
-  azure_monitor {
-    enabled = true
-    log_analytics_workspace_id = azurerm_log_analytics_workspace.workspace.id
+  # ✅ Enable Container Insights (OMS Agent)
+  addon_profile {
+    oms_agent {
+      enabled                    = true
+      log_analytics_workspace_id = azurerm_log_analytics_workspace.workspace.id
+    }
   }
 }
 
@@ -54,6 +56,15 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   data_flow {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
+  }
+}
+
+# ✅ Attach the DCR to the AKS Cluster
+resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
+  name                    = "aks-prometheus-dcr"
+  target_resource_id      = azurerm_kubernetes_cluster.aks.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus_dcr.id
+}eus-metrics"]
   }
 }
 
