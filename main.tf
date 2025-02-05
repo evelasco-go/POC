@@ -1,13 +1,3 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
-    }
-  }
-}
-
-
 # ✅ Provider Configuration for Azure
 provider "azurerm" {
   features {}
@@ -17,22 +7,26 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
+# ✅ Define Data Collection Rule for Prometheus Metrics
 resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   name                = "PrometheusDCR"
   location            = var.location
   resource_group_name = var.resource_group_name
 
+  # Define Destinations for Metrics
   destinations {
     azure_monitor_metrics {
       name = "prometheus-metrics"
     }
   }
 
+  # Define Data Flow: From Prometheus to Azure Monitor Metrics
   data_flow {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
   }
 
+  # Data Sources: Define Prometheus Forwarder
   data_sources {
     prometheus_forwarder {
       streams = ["Microsoft-PrometheusMetrics"]
@@ -41,6 +35,7 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   }
 }
 
+# ✅ Attach the Data Collection Rule to the Existing AKS Cluster
 resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
   name                    = "aks-prometheus-dcr"
   target_resource_id      = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
