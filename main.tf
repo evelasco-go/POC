@@ -13,11 +13,13 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  # ✅ Add the required `data_sources` block for Prometheus
+  # ✅ Add the required `data_sources` block for Prometheus using the correct scraper type
   data_sources {
-    prometheus_forwarder {
-      streams = ["Microsoft-PrometheusMetrics"]
-      name    = "prometheus-forwarder"
+    prometheus_scraper {
+      name = "prometheus-scraper"
+      streams = [
+        "Microsoft.PrometheusMetrics"
+      ]
     }
   }
 
@@ -30,7 +32,7 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
 
   # ✅ Define how data flows from Prometheus to Azure Monitor
   data_flow {
-    streams      = ["Microsoft-PrometheusMetrics"]
+    streams      = ["Microsoft.PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
   }
 }
