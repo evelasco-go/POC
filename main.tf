@@ -1,4 +1,4 @@
-# Provider configuration for Azure
+# ✅ Provider Configuration for Azure
 provider "azurerm" {
   features {}
   client_id       = var.azure_client_id
@@ -7,12 +7,12 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
-
 # ✅ Create a Data Collection Rule (DCR) for Prometheus Metrics
 resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   name                = "PrometheusDCR"
   location            = var.location
   resource_group_name = var.resource_group_name
+  kind                = "Linux"  # ✅ Required for Prometheus
 
   destinations {
     azure_monitor_metrics {
