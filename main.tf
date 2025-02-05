@@ -26,11 +26,13 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
 
   data_sources {
     performance_counter {
-      streams = ["Microsoft-PrometheusMetrics"]
-      name    = "prometheus-metrics-source"
+      name                          = "prometheus-metrics-source"
+      streams                       = ["Microsoft-PrometheusMetrics"]
+      sampling_frequency_in_seconds = 60  # ✅ Required field added
       counter_specifiers = [
         "\\Prometheus(*,*)\\*"
       ]
     }
   }
 }
+
