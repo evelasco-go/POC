@@ -7,38 +7,30 @@ provider "azurerm" {
   subscription_id = var.azure_subscription_id
 }
 
-# ✅ Define Data Collection Rule for Prometheus Metrics
 resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   name                = "PrometheusDCR"
   location            = var.location
   resource_group_name = var.resource_group_name
+  kind                = "Linux"  # Ensure this matches your AKS environment
 
-  # Define Destinations for Metrics
   destinations {
     azure_monitor_metrics {
       name = "prometheus-metrics"
     }
   }
 
-  # Define Data Flow: From Prometheus to Azure Monitor Metrics
   data_flow {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
   }
 
-  # Data Sources: Define Prometheus Forwarder
   data_sources {
-    prometheus_forwarder {
+    performance_counter {
       streams = ["Microsoft-PrometheusMetrics"]
-      name    = "prometheus-forwarder"
+      name    = "prometheus-metrics-source"
+      counter_specifiers = [
+        "\\Prometheus(*,*)\\*"
+      ]
     }
   }
 }
-
-# ✅ Attach the Data Collection Rule to the Existing AKS Cluster
-resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
-  name                    = "aks-prometheus-dcr"
-  target_resource_id      = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
-  data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus_dcr.id
-}
-
