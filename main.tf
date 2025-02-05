@@ -12,23 +12,27 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  # Define the data sources (Prometheus)
-  data_sources {
-    prometheus_scraper {
-      scrape_url = "http://your-prometheus-server:9090"  # Replace with your Prometheus server URL
-    }
-  }
-
-  # Define destinations for metrics collection
   destinations {
     azure_monitor_metrics {
       name = "prometheus-metrics"
     }
   }
 
-  # Define data flow from Prometheus to Azure Monitor
   data_flow {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
   }
+
+  # Use appropriate data sources if needed (e.g., Prometheus data, but this is not directly declared here)
+  // data_sources {
+  //    prometheus_scraper {
+  //        scrape_url = "http://your-prometheus-server:9090"
+  //    }
+  // }
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
+  name                    = "aks-prometheus-dcr"
+  target_resource_id      = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus_dcr.id
 }
