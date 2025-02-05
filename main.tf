@@ -22,13 +22,6 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
   }
-
-  # Use appropriate data sources if needed (e.g., Prometheus data, but this is not directly declared here)
-  // data_sources {
-  //    prometheus_scraper {
-  //        scrape_url = "http://your-prometheus-server:9090"
-  //    }
-  // }
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
@@ -36,3 +29,4 @@ resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association
   target_resource_id      = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${var.aks_name}"
   data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus_dcr.id
 }
+
