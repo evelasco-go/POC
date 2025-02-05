@@ -1,3 +1,8 @@
+provider "azurerm" {
+  features {}
+}
+
+
 # ✅ Create a Data Collection Rule (DCR) for Prometheus Metrics
 resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   name                = "PrometheusDCR"
