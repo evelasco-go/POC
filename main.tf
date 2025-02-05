@@ -13,13 +13,12 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  # ✅ Add the required `data_sources` block for Prometheus using the correct scraper type
+  # ✅ Add data sources for Prometheus metrics
   data_sources {
-    prometheus_scraper {
-      name = "prometheus-scraper"
-      streams = [
-        "Microsoft.PrometheusMetrics"
-      ]
+    prometheus {
+      name       = "prometheus-source"
+      streams    = ["Microsoft.PrometheusMetrics"]
+      scrape_url = "http://your-prometheus-server:9090"  # Add your Prometheus server URL
     }
   }
 
