@@ -42,9 +42,9 @@ stages:
         az account set --subscription $(azure_subscription_id)
       displayName: 'Azure CLI Login'
 
-    # ✅ Check Existing Data Collection Rules
+     # ✅ Check Existing Data Collection Rules (Fixed)
     - script: |
-        az monitor data-collection-rule list --resource-group $(resource_group_name) --query "[].name" -o table
+        az monitor data-collection list --resource-group $(resource_group_name) --query "[].name" -o table
       displayName: 'Check Existing Data Collection Rules'
 
     # ✅ Terraform Init
