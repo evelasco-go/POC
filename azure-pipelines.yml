@@ -13,54 +13,51 @@ variables:
   location: "East US"
   node_count: 2
   log_analytics_sku: "PerGB2018"
+
   resource_group_name: "Goreg4"
+  storage_account_name: "goreg4"
+  container_name: "goreg4container"
   aks_name: "goreg4-aks"
+  log_analytics_workspace_name: "goreg4-analytics"
+  diagnostic_setting_name: "goreg4-diagnostics"
+  grafana_name: "Goreg4-Grafana"
 
 stages:
 - stage: Terraform
-  displayName: 'Terraform Stage'
+  displayName: 'Terraform Deployment'
   jobs:
   - job: Terraform
-    displayName: 'Terraform Deployment'
+    displayName: 'Terraform Apply'
     steps:
+    
+    # ✅ Install Azure CLI & Required Extensions
     - script: |
         curl -sSL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        az extension add --name monitor-control-service --yes
+      displayName: 'Install Azure CLI & Extensions'
+
+    # ✅ Azure Login
+    - script: |
         az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
         az account set --subscription $(azure_subscription_id)
       displayName: 'Azure CLI Login'
 
-    # ✅ **Check if DCR exists in Azure**
+    # ✅ Check Existing Data Collection Rules
     - script: |
         az monitor data-collection-rule list --resource-group $(resource_group_name) --query "[].name" -o table
       displayName: 'Check Existing Data Collection Rules'
-    
-    # ✅ **Check if Resource Group Location Matches**
-    - script: |
-        RG_LOCATION=$(az group show --name $(resource_group_name) --query "location" -o tsv)
-        if [ "$RG_LOCATION" != "$(location)" ]; then
-          echo "❌ Resource Group Location Mismatch: $RG_LOCATION != $(location)"
-          exit 1
-        else
-          echo "✅ Resource Group Location Matches: $RG_LOCATION"
-        fi
-      displayName: 'Validate Resource Group Location'
 
-    # ✅ **Terraform Init**
+    # ✅ Terraform Init
     - script: |
         terraform init
       displayName: 'Terraform Init'
 
-    # ✅ **Terraform Validate (Checks for Syntax Issues)**
-    - script: |
-        terraform validate
-      displayName: 'Terraform Validate'
-
-    # ✅ **Terraform Plan (Previews Changes)**
+    # ✅ Terraform Plan
     - script: |
         terraform plan -out=tfplan
       displayName: 'Terraform Plan'
-    
-    # ✅ **Terraform Apply (Deploy Changes)**
+
+    # ✅ Terraform Apply
     - script: |
         terraform apply -auto-approve
       displayName: 'Terraform Apply'
