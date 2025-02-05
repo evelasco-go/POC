@@ -1,5 +1,3 @@
-
-
 variable "dcr_name" {
   description = "The name of the Data Collection Rule"
   type        = string
@@ -56,15 +54,6 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   data_flow {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
-  }
-}
-
-# ✅ Attach the DCR to the AKS Cluster
-resource "azurerm_monitor_data_collection_rule_association" "aks_dcr_association" {
-  name                    = "aks-prometheus-dcr"
-  target_resource_id      = azurerm_kubernetes_cluster.aks.id
-  data_collection_rule_id = azurerm_monitor_data_collection_rule.prometheus_dcr.id
-}eus-metrics"]
   }
 }
 
