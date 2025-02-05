@@ -12,14 +12,23 @@ resource "azurerm_monitor_data_collection_rule" "prometheus_dcr" {
   name                = "PrometheusDCR"
   location            = var.location
   resource_group_name = var.resource_group_name
-  kind                = "Linux"  # ✅ Required for Prometheus
 
+  # ✅ Add the required `data_sources` block for Prometheus
+  data_sources {
+    prometheus_forwarder {
+      streams = ["Microsoft-PrometheusMetrics"]
+      name    = "prometheus-forwarder"
+    }
+  }
+
+  # ✅ Ensure Prometheus data is sent to Azure Monitor Metrics
   destinations {
     azure_monitor_metrics {
       name = "prometheus-metrics"
     }
   }
 
+  # ✅ Define how data flows from Prometheus to Azure Monitor
   data_flow {
     streams      = ["Microsoft-PrometheusMetrics"]
     destinations = ["prometheus-metrics"]
