@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "resources": [
+    {
+      "type": "Microsoft.ContainerService/managedClusters",
+      "apiVersion": "2023-01-01",
+      "name": "[parameters('aksClusterName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "addonProfiles": {
+          "azuremonitor-metrics": {
+            "enabled": true,
+            "config": {
+              "enableManagedPrometheus": "true"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "parameters": {
+    "aksClusterName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the AKS cluster."
+      }
+    }
+  }
+}
