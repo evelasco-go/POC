@@ -43,20 +43,6 @@ resource "azurerm_kubernetes_cluster" "example" {
   identity {
     type = "SystemAssigned"
   }
-
-  # Enable Azure Monitor for containers
-  addon_profile {
-    oms_agent {
-      enabled = true
-      config {
-        log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
-      }
-    }
-
-    managed_prometheus {
-      enabled = true  # Enable Managed Prometheus
-    }
-  }
 }
 
 # Output kubeconfig (sensitive)
