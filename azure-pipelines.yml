@@ -232,6 +232,7 @@ stages:
             displayName: 'Configure Grafana Data Source'
 - stage: EnableRecordingRules
   displayName: 'Enable Prometheus Recording Rules'
+  condition: always()
   jobs:
       - job: EnableRecordingRules
         steps:
