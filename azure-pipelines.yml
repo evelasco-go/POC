@@ -9,151 +9,79 @@ variables:
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  terraformVersion: '1.3.5'
-  location: "East US"
-  node_count: 2
-  log_analytics_sku: "PerGB2018"
-
+  location: "eastus"
   resource_group_name: "Goreg4"
-  storage_account_name: "goreg4"
-  container_name: "goreg4container"
   aks_name: "goreg4-aks"
-  log_analytics_workspace_name: "goreg4-analytics"
-  diagnostic_setting_name: "goreg4-diagnostics"
-  grafana_name: "Goreg4-Grafana"
+  dcr_name: "PrometheusDCR"
 
 stages:
-- stage: Terraform
-  displayName: 'Terraform Stage'
-  jobs:
-  - job: Terraform
-    displayName: 'Terraform Deployment'
-    steps:
-    - script: |
-        curl -LO https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh
-        chmod +x install_linux.sh && ./install_linux.sh
-        curl -sSL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        
-        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-        az account set --subscription $(azure_subscription_id)
-      displayName: 'Azure CLI Login'
-    
-    - script: |
-        terraform init
-      displayName: 'Terraform Init'
-
-    - script: |
-        terraform plan -out=tfplan
-      displayName: 'Terraform Plan'
-    
-    - script: |
-        terraform apply -auto-approve
-      displayName: 'Terraform Apply'
-      env:
-        ARM_CLIENT_ID: $(azure_client_id)
-        ARM_CLIENT_SECRET: $(azure_client_secret)
-        ARM_TENANT_ID: $(azure_tenant_id)
-        ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
-
-- stage: DeployMonitoringStandalone
-  displayName: 'Deploy Prometheus and Grafana without dependencies'
-  condition: always()
-  jobs:
-      - job: HelmDeployment
-        displayName: 'Deploy Prometheus and Grafana via Helm'
-        steps:
-          - script: |
-              # Log in to Azure
-              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-              az account set --subscription $(azure_subscription_id)
-
-              # Get AKS credentials
-              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-
-              # Verify cluster connection
-              kubectl cluster-info
-
-              # Install Helm
-              curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-
-              # Add Helm repos
-              helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-              helm repo add grafana https://grafana.github.io/helm-charts
-              helm repo update
-
-              # Install Prometheus and Grafana
-              helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
-              helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
-
-              # Verify deployments
-              kubectl get pods -n monitoring
-            displayName: 'Install Prometheus and Grafana via Helm'
-
-- stage: EnableManagedPrometheusMetrics
-  displayName: 'Enable Managed Prometheus Metrics'
-  condition: always()
-  jobs:
+  - stage: EnablePrometheus
+    displayName: 'Enable Managed Prometheus'
+    jobs:
       - job: EnablePrometheus
-        displayName: 'Enable Managed Prometheus in AKS'
         steps:
           - script: |
-              # Log in to Azure
+              echo "🔑 Logging into Azure..."
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Get AKS credentials
-              az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
+              echo "🔄 Enabling Managed Prometheus..."
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-azure-monitor-metrics
+              echo "✅ Managed Prometheus enabled successfully!"
+            displayName: 'Enable Managed Prometheus'
 
-              # Enable Prometheus Monitoring
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-msi-auth-for-monitoring
-              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-monitoring
-
-              # Verify Prometheus activation
-              az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus"
-            displayName: 'Enable Managed Prometheus Metrics'
-
-
-- stage: SetupGrafana
-  displayName: 'Create Managed Grafana in Azure'
-  condition: always()
-  jobs:
-      - job: CreateGrafana
-        displayName: 'Ensure Managed Grafana Exists'
+  - stage: ConfigureDCR
+    displayName: 'Configure Data Collection Rule'
+    jobs:
+      - job: ConfigureDCR
         steps:
           - script: |
+              echo "🔑 Logging into Azure..."
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Check if Grafana exists
-              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
-                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location "eastus"
+              echo "🔄 Checking if Data Collection Rule (DCR) exists..."
+              DCR_EXISTS=$(az monitor data-collection rule show --name $(dcr_name) --resource-group $(resource_group_name) --query "name" -o tsv || echo "not_found")
+
+              if [ "$DCR_EXISTS" = "not_found" ]; then
+                echo "🔄 Creating new Data Collection Rule (DCR) for Prometheus..."
+                az monitor data-collection rule create \
+                  --name $(dcr_name) \
+                  --resource-group $(resource_group_name) \
+                  --location $(location) \
+                  --data-flows '[{"streams": ["Microsoft-PrometheusMetrics"], "destinations": ["azure-monitor-metrics"]}]' \
+                  --destinations name=azure-monitor-metrics type=azure-monitor-metrics
+                
+                echo "✅ Data Collection Rule (DCR) created successfully!"
+              else
+                echo "✅ DCR already exists. Skipping creation."
               fi
-            displayName: 'Create Grafana if not exists'
+            displayName: 'Create Data Collection Rule (DCR)'
 
-- stage: LinkGrafanaToPrometheus
-  displayName: 'Link Grafana to Managed Prometheus'
-  condition: always()
-  jobs:
-      - job: LinkGrafana
-        displayName: 'Configure Grafana Data Source'
+  - stage: EnableRecordingRules
+    displayName: 'Enable Prometheus Recording Rules'
+    jobs:
+      - job: EnableRecordingRules
         steps:
           - script: |
+              echo "🔑 Logging into Azure..."
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Get Prometheus URL
-              PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+              echo "🔄 Checking if Recording Rules are enabled..."
+              RECORDING_RULES_ENABLED=$(az monitor metrics alert list --resource-group $(resource_group_name) --query "[?name=='PrometheusRecordingRules'].name" -o tsv || echo "not_found")
 
-              # Ensure Prometheus is enabled
-              if [ -z "$PROMETHEUS_URL" ]; then
-                az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
-                sleep 60  # Give some time for Prometheus to activate
-                PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+              if [ "$RECORDING_RULES_ENABLED" = "not_found" ]; then
+                echo "🔄 Configuring Prometheus Recording Rules..."
+                az monitor metrics alert create \
+                  --name "PrometheusRecordingRules" \
+                  --resource-group $(resource_group_name) \
+                  --scopes "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Insights/dataCollectionRules/$(dcr_name)" \
+                  --condition "avg AzureMonitorPrometheusRecordingRule > 0" \
+                  --window-size 5m \
+                  --evaluation-frequency 1m
+                echo "✅ Prometheus Recording Rules enabled successfully!"
+              else
+                echo "✅ Recording Rules already configured. Skipping."
               fi
-
-              # Wait for Grafana to be ready
-              sleep 30
-
-              # Add Prometheus data source to Grafana
-              az grafana data-source create --name prometheus --resource-group $(resource_group_name) --grafana-name $(grafana_name) --type prometheus --url "$PROMETHEUS_URL"
-            displayName: 'Link Grafana to Prometheus'
+            displayName: 'Enable Prometheus Recording Rules'
