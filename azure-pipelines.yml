@@ -121,7 +121,6 @@ stages:
 
 - stage: DeployMonitoringStandalone
   displayName: 'Deploy Prometheus and Grafana without dependencies'
-  dependsOn: Terraform
   condition: always()
   jobs:
       - job: HelmDeployment
@@ -158,9 +157,9 @@ stages:
   displayName: 'Enable Managed Prometheus Metrics'
   condition: always()
   jobs:
-    - job: EnablePrometheus
-      displayName: 'Enable Managed Prometheus in AKS'
-      steps:
+      - job: EnablePrometheus
+        displayName: 'Enable Managed Prometheus in AKS'
+        steps:
           - script: |
               # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
@@ -169,32 +168,65 @@ stages:
               # Get AKS credentials
               az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
 
-              # Enable Azure Monitor for Containers (Managed Prometheus)
-              az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+              # Enable Prometheus Monitoring
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-msi-auth-for-monitoring
+              az aks update --resource-group $(resource_group_name) --name $(aks_name) --enable-prometheus-monitoring
 
-              # Verify that Prometheus is enabled
-              kubectl get managedprometheus -n kube-system
+              # Verify Prometheus activation
+              az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus"
             displayName: 'Enable Managed Prometheus Metrics'
 
-- stage: LinkGrafanaToPrometheus
-  displayName: 'Link Azure Managed Grafana to Prometheus'
+
+- stage: SetupGrafana
+  displayName: 'Create Managed Grafana in Azure'
   condition: always()
   jobs:
-      - job: LinkGrafana
-        displayName: 'Link Grafana to Managed Prometheus'
+      - job: CreateGrafana
+        displayName: 'Ensure Managed Grafana Exists'
         steps:
           - script: |
-              # Log in to Azure
               az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
               az account set --subscription $(azure_subscription_id)
 
-              # Enable Managed Grafana if not exists
-              az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location $(location)
+              # Check if Grafana exists
+              if ! az grafana show --name $(grafana_name) --resource-group $(resource_group_name) &> /dev/null; then
+                az grafana create --name $(grafana_name) --resource-group $(resource_group_name) --location "eastus"
+              fi
+            displayName: 'Create Grafana if not exists'
 
-              # Link Grafana to Prometheus
-              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --type prometheus --url https://$(aks_name).prometheus.monitoring.azure.com --access proxy --is-default true
+- stage: LinkGrafanaToPrometheus
+  displayName: 'Link Grafana to Managed Prometheus'
+  condition: always()
+  jobs:
+      - job: LinkGrafana
+        displayName: 'Configure Grafana Data Source'
+        steps:
+          - script: |
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-              # Verify link
+              # Get Prometheus URL
+              PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+
+              # Ensure Prometheus is enabled
+              if [ -z "$PROMETHEUS_URL" ]; then
+                az aks enable-addons --resource-group $(resource_group_name) --name $(aks_name) --addons monitoring
+                sleep 60  # Give some time for Prometheus to activate
+                PROMETHEUS_URL=$(az aks show --resource-group $(resource_group_name) --name $(aks_name) --query "addonProfiles.prometheus.config.prometheusEndpoint" -o tsv)
+              fi
+
+              # Wait for Grafana to be ready
+              sleep 30
+
+              # Add Prometheus data source to Grafana
+              az grafana data-source create --name $(grafana_name) --resource-group $(resource_group_name) --definition '{
+                  "name": "Azure Monitor Prometheus",
+                  "type": "prometheus",
+                  "access": "proxy",
+                  "url": "'"$PROMETHEUS_URL"'",
+                  "isDefault": true
+              }'
+
+              # Verify data source was added
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
-            displayName: 'Configure Grafana Data Source'        
-        
+            displayName: 'Configure Grafana Data Source'
