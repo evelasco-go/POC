@@ -156,6 +156,7 @@ stages:
 
 - stage: EnablePrometheus
   displayName: 'Enable Managed Prometheus'
+  condition: always()
   jobs:
       - job: EnablePrometheus
         steps:
@@ -226,6 +227,7 @@ stages:
 
 - stage: ConfigureDCR
   displayName: 'Configure Data Collection Rule'
+  condition: always()
   jobs:
       - job: ConfigureDCR
         steps:
@@ -254,6 +256,7 @@ stages:
 
 - stage: EnableRecordingRules
   displayName: 'Enable Prometheus Recording Rules'
+  condition: always()
   jobs:
       - job: EnableRecordingRules
         steps:
