@@ -121,6 +121,8 @@ stages:
 
 - stage: DeployMonitoringStandalone
   displayName: 'Deploy Prometheus and Grafana without dependencies'
+  dependsOn: Terraform
+  condition: always()
   jobs:
       - job: HelmDeployment
         displayName: 'Deploy Prometheus and Grafana via Helm'
