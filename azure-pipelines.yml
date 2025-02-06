@@ -119,34 +119,6 @@ stages:
         ARM_TENANT_ID: $(azure_tenant_id)
         ARM_SUBSCRIPTION_ID: $(azure_subscription_id)
 
-- stage: DeployMonitoring
-  displayName: 'Deploy Monitoring Tools'
-  dependsOn: Terraform
-  condition: always()
-  jobs:
-  - job: HelmDeployment
-    displayName: 'Deploy Prometheus and Grafana via Helm'
-    steps:
-    - script: |
-        az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-        az account set --subscription $(azure_subscription_id)
-
-        az aks get-credentials --resource-group $(resource_group_name) --name $(aks_name)
-
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-        helm repo add grafana https://grafana.github.io/helm-charts
-        helm repo update
-
-        helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --wait
-        helm install grafana grafana/grafana --namespace monitoring --set adminPassword='yourpassword' --set service.type=LoadBalancer --wait
-
-        kubectl get pods -n monitoring
-      displayName: 'Install Prometheus and Grafana via Helm'
-      env:
-        KUBECONFIG: $(Build.SourcesDirectory)/.kube/config
-
 - stage: DeployMonitoringStandalone
   displayName: 'Deploy Prometheus and Grafana without dependencies'
   jobs:
