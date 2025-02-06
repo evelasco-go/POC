@@ -230,3 +230,30 @@ stages:
               # Verify data source was added
               az grafana data-source list --name $(grafana_name) --resource-group $(resource_group_name)
             displayName: 'Configure Grafana Data Source'
+- stage: EnableRecordingRules
+  displayName: 'Enable Prometheus Recording Rules'
+  jobs:
+      - job: EnableRecordingRules
+        steps:
+          - script: |
+              echo "🔑 Logging into Azure..."
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
+
+              echo "🔄 Checking if Recording Rules are enabled..."
+              RECORDING_RULES_ENABLED=$(az monitor metrics alert list --resource-group $(resource_group_name) --query "[?name=='PrometheusRecordingRules'].name" -o tsv || echo "not_found")
+
+              if [ "$RECORDING_RULES_ENABLED" = "not_found" ]; then
+                echo "🔄 Configuring Prometheus Recording Rules..."
+                az monitor metrics alert create \
+                  --name "PrometheusRecordingRules" \
+                  --resource-group $(resource_group_name) \
+                  --scopes "/subscriptions/$(azure_subscription_id)/resourceGroups/$(resource_group_name)/providers/Microsoft.Insights/dataCollectionRules/$(dcr_name)" \
+                  --condition "avg AzureMonitorPrometheusRecordingRule > 0" \
+                  --window-size 5m \
+                  --evaluation-frequency 1m
+                echo "✅ Prometheus Recording Rules enabled successfully!"
+              else
+                echo "✅ Recording Rules already configured. Skipping."
+              fi
+            displayName: 'Enable Prometheus Recording Rules'
