@@ -156,6 +156,7 @@ stages:
 
 - stage: EnableManagedPrometheusMetrics
   displayName: 'Enable Managed Prometheus Metrics'
+  condition: always()
   jobs:
     - job: EnablePrometheus
       displayName: 'Enable Managed Prometheus in AKS'
@@ -177,6 +178,7 @@ stages:
 
 - stage: LinkGrafanaToPrometheus
   displayName: 'Link Azure Managed Grafana to Prometheus'
+  condition: always()
   jobs:
       - job: LinkGrafana
         displayName: 'Link Grafana to Managed Prometheus'
