@@ -122,6 +122,7 @@ stages:
 - stage: DeployMonitoring
   displayName: 'Deploy Monitoring Tools'
   dependsOn: Terraform
+  condition: always()
   jobs:
   - job: HelmDeployment
     displayName: 'Deploy Prometheus and Grafana via Helm'
