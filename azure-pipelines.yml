@@ -321,7 +321,7 @@ stages:
               --analytics-query "
               ContainerLog
               | where LogLevel == 'Error' or LogMessage contains 'error'
-              | project TimeGenerated, Name, Namespace, LogMessage
+              | project TimeGenerated, Name, LogMessage
               | order by TimeGenerated desc" \
               --output table
           displayName: 'Run KQL Queries for Errors'            
