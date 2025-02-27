@@ -23,6 +23,9 @@ stages:
       displayName: 'Create and Link Application Insights'
       steps:
         - script: |
+            echo "🔄 Updating Azure CLI..."
+            az upgrade --yes
+
             echo "🔑 Logging into Azure..."
             az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
             az account set --subscription $(azure_subscription_id)
@@ -59,7 +62,7 @@ stages:
             fi
 
             echo "🔹 Creating a Predefined KQL Query..."
-            az monitor log-analytics saved-search create \
+            az monitor saved-search create \
               --resource-group "$(resource_group_name)" \
               --workspace-name "$(log_analytics_workspace_name)" \
               --name "$(saved_query_name)" \
@@ -70,7 +73,7 @@ stages:
               | where Message contains 'Error' or SeverityLevel == 3
               | project timestamp, message, type, operation_Name, cloud_RoleInstance
               | order by timestamp desc"
-            
+
             echo "✅ Predefined KQL Query Added to Log Analytics."
           displayName: 'Create Application Insights and Add Predefined KQL Query'
 
@@ -83,6 +86,9 @@ stages:
       displayName: 'Run KQL Queries to Fetch Errors'
       steps:
         - script: |
+            echo "🔄 Updating Azure CLI..."
+            az upgrade --yes
+
             echo "🔑 Logging into Azure..."
             az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
             az account set --subscription $(azure_subscription_id)
@@ -98,14 +104,22 @@ stages:
               exit 1
             fi
 
-            echo "🔎 Running Predefined KQL Query from Logs..."
+            echo "🔎 Fetching Predefined KQL Query..."
+            query_text=$(az monitor saved-search show \
+              --resource-group "$(resource_group_name)" \
+              --workspace-name "$(log_analytics_workspace_name)" \
+              --name "$(saved_query_name)" \
+              --query "properties.query" -o tsv)
+
+            if [ -z "$query_text" ]; then
+              echo "❌ No saved query found!"
+              exit 1
+            fi
+
+            echo "🔎 Running Predefined KQL Query..."
             query_result=$(az monitor log-analytics query \
               --workspace "$workspace_id" \
-              --analytics-query "$(az monitor log-analytics saved-search show \
-                --resource-group "$(resource_group_name)" \
-                --workspace-name "$(log_analytics_workspace_name)" \
-                --name "$(saved_query_name)" \
-                --query "query" -o tsv)" \
+              --analytics-query "$query_text" \
               --output json 2>&1)
 
             if echo "$query_result" | grep -q '"tables": \[\]'; then
