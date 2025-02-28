@@ -8,127 +8,101 @@ variables:
   azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
   azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
   azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
   location: "East US"
-
   resource_group_name: "Goreg4"
   log_analytics_workspace_name: "goreg4-analytics"
   app_insights_name: "Goreg4-AppInsights"
   saved_query_name: "ErrorLogsQuery"
+  saved_query_display_name: "Error Logs Analysis"
+  saved_query_category: "Errors"
 
 stages:
-- stage: SetupMonitoring
-  displayName: 'Enable Application Insights and Logs'
-  jobs:
-    - job: EnableInsights
-      displayName: 'Create and Link Application Insights'
-      steps:
-        - script: |
-            echo "🔄 Updating Azure CLI..."
-            az upgrade --yes
+  - stage: SetupAndFetchErrors
+    displayName: 'Setup Monitoring and Fetch Errors'
+    jobs:
+      - job: SetupMonitoring
+        displayName: 'Enable Application Insights and Log Analytics'
+        steps:
+          - script: |
+              echo "🔑 Logging into Azure..."
+              az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+              az account set --subscription $(azure_subscription_id)
 
-            echo "🔑 Logging into Azure..."
-            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-            az account set --subscription $(azure_subscription_id)
+              echo "🔎 Checking if Application Insights exists..."
+              exists=$(az monitor app-insights component show --app $(app_insights_name) --resource-group $(resource_group_name) --query id -o tsv || echo "")
 
-            echo "🔎 Checking if Application Insights exists..."
-            app_insights_exists=$(az monitor app-insights component show \
-              --app "$(app_insights_name)" \
-              --resource-group "$(resource_group_name)" \
-              --query "id" -o tsv 2>/dev/null || echo "")
+              if [ -z "$exists" ]; then
+                echo "⚠️ Application Insights not found. Creating..."
+                az monitor app-insights component create --app $(app_insights_name) --location $(location) --resource-group $(resource_group_name) --kind web --application-type web
+              else
+                echo "✅ Application Insights exists."
+              fi
 
-            if [ -z "$app_insights_exists" ]; then
-              echo "⚠️ Application Insights not found. Creating it..."
-              az monitor app-insights component create \
-                --app "$(app_insights_name)" \
-                --location "$(location)" \
-                --kind "web" \
-                --resource-group "$(resource_group_name)" \
-                --application-type "web" \
-                --workspace "$(log_analytics_workspace_name)"
-              echo "✅ Application Insights created successfully."
-            else
-              echo "✅ Application Insights already exists."
-            fi
+              echo "🔗 Linking Application Insights to Log Analytics..."
+              az monitor app-insights component update --app $(app_insights_name) --resource-group $(resource_group_name) --workspace $(log_analytics_workspace_name)
+            displayName: 'Enable Application Insights and Link to Log Analytics'
 
-            echo "🔎 Getting Log Analytics Workspace ID..."
-            workspace_id=$(az monitor log-analytics workspace show \
-              --resource-group "$(resource_group_name)" \
-              --workspace-name "$(log_analytics_workspace_name)" \
-              --query "customerId" -o tsv)
+      - job: CreateSavedQuery
+        displayName: 'Create Saved KQL Query in Log Analytics'
+        dependsOn: SetupMonitoring
+        steps:
+          - script: |
+              echo "🔎 Getting Log Analytics Workspace ID..."
+              workspace_id=$(az monitor log-analytics workspace show \
+                --resource-group $(resource_group_name) \
+                --workspace-name $(log_analytics_workspace_name) \
+                --query customerId -o tsv)
 
-            if [ -z "$workspace_id" ]; then
-              echo "❌ Failed to get Log Analytics Workspace ID"
-              exit 1
-            fi
+              if [ -z "$workspace_id" ]; then
+                echo "❌ Failed to get Log Analytics Workspace ID"
+                exit 1
+              fi
 
-            echo "🔹 Creating a Predefined KQL Query..."
-            az monitor saved-search create \
-              --resource-group "$(resource_group_name)" \
-              --workspace-name "$(log_analytics_workspace_name)" \
-              --name "$(saved_query_name)" \
-              --category "ErrorLogs" \
-              --display-name "Predefined Error Logs Query" \
-              --query "
-              union AppTraces, AppRequests, AppDependencies, AppExceptions, AppEvents
-              | where Message contains 'Error' or SeverityLevel == 3
-              | project timestamp, message, type, operation_Name, cloud_RoleInstance
-              | order by timestamp desc"
+              echo "🔎 Checking if the saved KQL query already exists..."
+              query_exists=$(az monitor log-analytics query-pack list --resource-group $(resource_group_name) --workspace-name $(log_analytics_workspace_name) --query "[?properties.displayName=='$(saved_query_display_name)']" -o tsv)
 
-            echo "✅ Predefined KQL Query Added to Log Analytics."
-          displayName: 'Create Application Insights and Add Predefined KQL Query'
+              if [ -z "$query_exists" ]; then
+                echo "✅ Creating Saved KQL Query..."
+                az monitor log-analytics query-pack create \
+                  --resource-group $(resource_group_name) \
+                  --workspace-name $(log_analytics_workspace_name) \
+                  --name $(saved_query_name) \
+                  --display-name "$(saved_query_display_name)" \
+                  --category "$(saved_query_category)" \
+                  --query "union AppTraces, AppRequests, AppDependencies, AppExceptions, AppEvents | where Message contains 'Error' | project timestamp, message, type | order by timestamp desc"
+              else
+                echo "⚠️ Query already exists, skipping creation."
+              fi
+            displayName: 'Create Predefined KQL Query'
 
-- stage: FetchErrors
-  displayName: 'Fetch All Errors from Logs'
-  dependsOn: SetupMonitoring
-  condition: always()
-  jobs:
-    - job: GetErrors
-      displayName: 'Run KQL Queries to Fetch Errors'
-      steps:
-        - script: |
-            echo "🔄 Updating Azure CLI..."
-            az upgrade --yes
+      - job: FetchErrors
+        displayName: 'Run Predefined KQL Queries for Errors'
+        dependsOn: CreateSavedQuery
+        condition: always()
+        steps:
+          - script: |
+              echo "🔎 Getting Log Analytics Workspace ID..."
+              workspace_id=$(az monitor log-analytics workspace show \
+                --resource-group $(resource_group_name) \
+                --workspace-name $(log_analytics_workspace_name) \
+                --query customerId -o tsv)
 
-            echo "🔑 Logging into Azure..."
-            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-            az account set --subscription $(azure_subscription_id)
+              if [ -z "$workspace_id" ]; then
+                echo "❌ Failed to get Log Analytics Workspace ID"
+                exit 1
+              fi
 
-            echo "🔎 Getting Log Analytics Workspace ID..."
-            workspace_id=$(az monitor log-analytics workspace show \
-              --resource-group "$(resource_group_name)" \
-              --workspace-name "$(log_analytics_workspace_name)" \
-              --query "customerId" -o tsv)
+              echo "🔎 Running Predefined KQL Query from Logs..."
+              query_results=$(az monitor log-analytics query \
+                --workspace "$workspace_id" \
+                --analytics-query "union AppTraces, AppRequests, AppDependencies, AppExceptions, AppEvents | where Message contains 'Error' | project timestamp, message, type | order by timestamp desc" \
+                --output table)
 
-            if [ -z "$workspace_id" ]; then
-              echo "❌ Failed to get Log Analytics Workspace ID"
-              exit 1
-            fi
-
-            echo "🔎 Fetching Predefined KQL Query..."
-            query_text=$(az monitor saved-search show \
-              --resource-group "$(resource_group_name)" \
-              --workspace-name "$(log_analytics_workspace_name)" \
-              --name "$(saved_query_name)" \
-              --query "properties.query" -o tsv)
-
-            if [ -z "$query_text" ]; then
-              echo "❌ No saved query found!"
-              exit 1
-            fi
-
-            echo "🔎 Running Predefined KQL Query..."
-            query_result=$(az monitor log-analytics query \
-              --workspace "$workspace_id" \
-              --analytics-query "$query_text" \
-              --output json 2>&1)
-
-            if echo "$query_result" | grep -q '"tables": \[\]'; then
-              echo "⚠️ No errors found in Application Insights."
-            elif echo "$query_result" | grep -q 'SemanticError'; then
-              echo "❌ KQL Query Error: Failed to fetch Application Insights logs."
-              echo "$query_result"
-            else
-              echo "✅ Application Insights Errors:"
-              echo "$query_result" | jq .
-            fi
-          displayName: 'Run Predefined KQL Queries for Errors'
+              if [ -z "$query_results" ]; then
+                echo "❌ No errors found in logs."
+                exit 0
+              else
+                echo "$query_results"
+              fi
+            displayName: 'Run Predefined KQL Queries for Errors'
