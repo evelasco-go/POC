@@ -11,16 +11,14 @@ variables:
   azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
   location: "East US"
   resource_group_name: "Goreg4"
-  log_analytics_workspace_name: "goreg4-analytics"
   app_insights_name: "Goreg4-AppInsights"
-  predefined_kql_name: "ErrorLogsQuery"
 
 stages:
 - stage: SetupMonitoring
-  displayName: 'Setup Monitoring Services'
+  displayName: 'Setup Application Insights Monitoring'
   jobs:
     - job: SetupResources
-      displayName: 'Enable App Insights and Link to Log Analytics'
+      displayName: 'Enable App Insights'
       steps:
         - script: |
             echo "🔑 Logging into Azure..."
@@ -42,7 +40,6 @@ stages:
                 --app $(app_insights_name) \
                 --location $(location) \
                 --resource-group $(resource_group_name) \
-                --workspace $(log_analytics_workspace_name) \
                 --kind web \
                 --application-type web
               echo "✅ Application Insights created."
@@ -51,49 +48,9 @@ stages:
             fi
           displayName: 'Create Application Insights if Missing'
 
-- stage: CreateSavedQuery
-  displayName: 'Create Predefined KQL Query in Log Analytics'
-  dependsOn: SetupMonitoring
-  jobs:
-    - job: CreateSavedQuery
-      displayName: 'Create Saved KQL Query'
-      steps:
-        - script: |
-            echo "🔑 Logging into Azure..."
-            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-            az account set --subscription $(azure_subscription_id)
-          displayName: 'Authenticate with Azure'
-
-        - script: |
-            echo "🔎 Getting Log Analytics Workspace ID..."
-            workspace_id=$(az monitor log-analytics workspace show \
-              --resource-group $(resource_group_name) \
-              --workspace-name $(log_analytics_workspace_name) \
-              --query customerId -o tsv)
-
-            if [ -z "$workspace_id" ]; then
-              echo "❌ Failed to get Log Analytics Workspace ID"
-              exit 1
-            fi
-
-            echo "🔄 Creating saved KQL query..."
-            az monitor log-analytics saved-search create \
-              --resource-group $(resource_group_name) \
-              --workspace-name $(log_analytics_workspace_name) \
-              --name $(predefined_kql_name) \
-              --category "CustomQueries" \
-              --query "
-              union AppTraces, AppRequests, AppDependencies, AppExceptions
-              | where Message contains 'Error' or SeverityLevel == 3
-              | project timestamp, message, type, operation_Name, cloud_RoleInstance
-              | order by timestamp desc"
-              
-            echo "✅ Saved KQL query created."
-          displayName: 'Create KQL Query'
-
 - stage: RunKQLQuery
-  displayName: 'Run Predefined KQL Queries for Errors'
-  dependsOn: CreateSavedQuery
+  displayName: 'Run KQL Query in Application Insights'
+  dependsOn: SetupMonitoring
   jobs:
     - job: RunSavedQuery
       displayName: 'Fetch Errors from Logs'
@@ -105,22 +62,15 @@ stages:
           displayName: 'Authenticate with Azure'
 
         - script: |
-            echo "🔎 Getting Log Analytics Workspace ID..."
-            workspace_id=$(az monitor log-analytics workspace show \
-              --resource-group $(resource_group_name) \
-              --workspace-name $(log_analytics_workspace_name) \
-              --query customerId -o tsv)
-
-            if [ -z "$workspace_id" ]; then
-              echo "❌ Failed to get Log Analytics Workspace ID"
-              exit 1
-            fi
-
-            echo "🔎 Running saved KQL query..."
-            az monitor log-analytics query \
-              --workspace "$workspace_id" \
-              --analytics-query "union AppTraces, AppRequests, AppDependencies, AppExceptions | where Message contains 'Error' or SeverityLevel == 3 | project timestamp, message, type, operation_Name, cloud_RoleInstance | order by timestamp desc" \
+            echo "🔎 Running KQL query in Application Insights..."
+            az monitor app-insights query \
+              --app $(app_insights_name) \
+              --analytics-query "
+              union traces, requests, dependencies, exceptions
+              | where severityLevel == 3 or message contains 'Error'
+              | project timestamp=timestamp_t, message, type, operation_Name, cloud_RoleInstance
+              | order by timestamp desc" \
               --output table
 
             echo "✅ KQL query executed successfully."
-          displayName: 'Execute KQL Query'
+          displayName: 'Execute KQL Query in App Insights'
