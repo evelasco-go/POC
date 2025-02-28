@@ -1,76 +1,70 @@
 trigger:
-  - dev
+- main  # Change this to your branch if needed
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
-  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
-  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
-  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
-  location: "East US"
-  resource_group_name: "Goreg4"
-  app_insights_name: "Goreg4-AppInsights"
+  azure_subscription_id: 'YOUR_SUBSCRIPTION_ID'
+  azure_client_id: 'YOUR_CLIENT_ID'
+  azure_client_secret: 'YOUR_CLIENT_SECRET'
+  azure_tenant_id: 'YOUR_TENANT_ID'
+  resource_group: 'YOUR_RESOURCE_GROUP'
+  app_insights_name: 'YOUR_APP_INSIGHTS_NAME'
+  workspace_name: 'YOUR_LOG_ANALYTICS_WORKSPACE_NAME'
+  query_name: 'PredefinedErrorQuery'
 
-stages:
-- stage: SetupMonitoring
-  displayName: 'Setup Application Insights Monitoring'
-  jobs:
-    - job: SetupResources
-      displayName: 'Enable App Insights'
-      steps:
-        - script: |
-            echo "🔑 Logging into Azure..."
-            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-            az account set --subscription $(azure_subscription_id)
-          displayName: 'Authenticate with Azure'
+steps:
 
-        - script: |
-            echo "🔎 Checking if Application Insights exists..."
-            app_insights_id=$(az resource show \
-              --resource-group $(resource_group_name) \
-              --resource-type "Microsoft.Insights/components" \
-              --name $(app_insights_name) \
-              --query "id" -o tsv || echo "")
+# ✅ Step 1: Authenticate with Azure
+- script: |
+    az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+    az account set --subscription $(azure_subscription_id)
+  displayName: '🔑 Authenticate with Azure'
 
-            if [ -z "$app_insights_id" ]; then
-              echo "⚠️ Application Insights not found. Creating..."
-              az monitor app-insights component create \
-                --app $(app_insights_name) \
-                --location $(location) \
-                --resource-group $(resource_group_name) \
-                --kind web \
-                --application-type web
-              echo "✅ Application Insights created."
-            else
-              echo "✅ Application Insights already exists."
-            fi
-          displayName: 'Create Application Insights if Missing'
+# ✅ Step 2: Verify Application Insights Exists
+- script: |
+    app_id=$(az monitor app-insights component show --app $(app_insights_name) --resource-group $(resource_group) --query "appId" -o tsv)
+    
+    if [ -z "$app_id" ]; then
+      echo "❌ ERROR: Application Insights $(app_insights_name) not found in $(resource_group)"
+      exit 1
+    else
+      echo "✅ Application Insights found: $app_id"
+    fi
+  displayName: '🔎 Verify Application Insights Exists'
 
-- stage: RunKQLQuery
-  displayName: 'Run KQL Query in Application Insights'
-  dependsOn: SetupMonitoring
-  jobs:
-    - job: RunSavedQuery
-      displayName: 'Fetch Errors from Logs'
-      steps:
-        - script: |
-            echo "🔑 Logging into Azure..."
-            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
-            az account set --subscription $(azure_subscription_id)
-          displayName: 'Authenticate with Azure'
+# ✅ Step 3: Get Log Analytics Workspace ID
+- script: |
+    workspace_id=$(az monitor log-analytics workspace show --resource-group $(resource_group) --workspace-name $(workspace_name) --query "customerId" -o tsv)
+    
+    if [ -z "$workspace_id" ]; then
+      echo "❌ ERROR: Log Analytics Workspace $(workspace_name) not found in $(resource_group)"
+      exit 1
+    else
+      echo "✅ Log Analytics Workspace ID: $workspace_id"
+    fi
+  displayName: '🔎 Get Log Analytics Workspace ID'
 
-        - script: |
-            echo "🔎 Running KQL query in Application Insights..."
-            az monitor app-insights query \
-              --app $(app_insights_name) \
-              --analytics-query "
-              union traces, requests, dependencies, exceptions
-              | where severityLevel == 3 or message contains 'Error'
-              | project timestamp=timestamp_t, message, type, operation_Name, cloud_RoleInstance
-              | order by timestamp desc" \
-              --output table
+# ✅ Step 4: Create a Predefined KQL Query in Application Insights
+- script: |
+    kql_query="traces | where severityLevel == 3 | project timestamp, message, operation_Id | order by timestamp desc"
+    
+    az monitor app-insights api-key create --resource-group $(resource_group) --app $(app_insights_name) --api-key $(query_name) --read-properties "ReadTelemetry"
+    
+    az monitor app-insights component query --app $(app_insights_name) --analytics-query "$kql_query"
+    
+    echo "✅ KQL Query Created: $query_name"
+  displayName: '📌 Create Predefined KQL Query'
 
-            echo "✅ KQL query executed successfully."
-          displayName: 'Execute KQL Query in App Insights'
+# ✅ Step 5: Run the KQL Query
+- script: |
+    results=$(az monitor app-insights query --app $(app_insights_name) --analytics-query "traces | where severityLevel == 3 | project timestamp, message, operation_Id | order by timestamp desc" -o table)
+
+    if [ -z "$results" ]; then
+      echo "❌ No errors found in Application Insights."
+    else
+      echo "✅ Errors found in Application Insights:"
+      echo "$results"
+    fi
+  displayName: '🚀 Run Predefined KQL Query'
