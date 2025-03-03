@@ -12,6 +12,7 @@ variables:
   location: "East US"
   resource_group_name: "Goreg4"
   app_insights_name: "Goreg4-AppInsights"
+  log_analytics_workspace_name: "Goreg4-Logs"
 
 stages:
 - stage: SetupMonitoring
@@ -74,3 +75,58 @@ stages:
 
             echo "✅ KQL query executed successfully."
           displayName: 'Execute Extended KQL Query in App Insights'
+
+- stage: FetchErrors
+  displayName: 'Fetch All Errors from Logs'
+  condition: always()
+  dependsOn: RunKQLQuery
+  jobs:
+    - job: GetErrors
+      displayName: 'Run KQL Queries to Fetch Errors'
+      steps:
+        - script: |
+            echo "🔑 Logging into Azure..."
+            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+            az account set --subscription $(azure_subscription_id)
+
+            echo "🔎 Getting Workspace ID..."
+            workspace_id=$(az monitor log-analytics workspace show \
+              --resource-group $(resource_group_name) \
+              --workspace-name $(log_analytics_workspace_name) \
+              --query customerId -o tsv)
+
+            if [ -z "$workspace_id" ]; then
+              echo "❌ Failed to get Log Analytics Workspace ID"
+              exit 1
+            fi
+
+            echo "🔎 Fetching all errors from Azure Monitor..."
+            az monitor log-analytics query \
+              --workspace "$workspace_id" \
+              --analytics-query "
+              AzureDiagnostics
+              | where SeverityLevel == 'Error' or Level == 'Error'
+              | project TimeGenerated, Resource, OperationName, Message, Category, _ResourceId
+              | order by TimeGenerated desc" \
+              --output table
+
+            echo "🔎 Fetching all errors from Application Insights..."
+            az monitor log-analytics query \
+              --workspace "$workspace_id" \
+              --analytics-query "
+              union exceptions, traces
+              | where severityLevel == 'Error'
+              | project timestamp, message, type, operation_Name, cloud_RoleInstance
+              | order by timestamp desc" \
+              --output table
+
+            echo "🔎 Fetching all errors from Kubernetes Logs..."
+            az monitor log-analytics query \
+              --workspace "$workspace_id" \
+              --analytics-query "
+              ContainerLog
+              | where LogLevel == 'Error' or LogMessage contains 'error'
+              | project TimeGenerated, Name, Namespace, LogMessage
+              | order by TimeGenerated desc" \
+              --output table
+          displayName: 'Run KQL Queries for Errors'
