@@ -75,7 +75,6 @@ stages:
                 --workspace-name $(log_analytics_workspace_name) \
                 --location $(location)
 
-              echo "🔎 Rechecking Workspace ID..."
               workspace_id=$(az monitor log-analytics workspace show \
                 --resource-group $(resource_group_name) \
                 --workspace-name $(log_analytics_workspace_name) \
@@ -89,33 +88,31 @@ stages:
 
             echo "✅ Found Log Analytics Workspace ID: $workspace_id"
 
+            echo "🔎 Checking available tables..."
+            az monitor log-analytics query \
+              --workspace "$workspace_id" \
+              --analytics-query "print schema()" \
+              --output table
+
             echo "🔎 Fetching all errors from Azure Monitor..."
             az monitor log-analytics query \
               --workspace "$workspace_id" \
               --analytics-query "
-              AzureDiagnostics
-              | where SeverityLevel == 'Error' or Level == 'Error'
-              | project TimeGenerated, Resource, OperationName, Message, Category, _ResourceId
+              let logs = dynamic(['AzureDiagnostics', 'AppTraces', 'AppRequests', 'AppExceptions']);
+              union isfuzzy=true withsource=TableName logs
+              | where tostring(severityLevel) == 'Error' or tostring(Level) == 'Error'
+              | project TimeGenerated, TableName, Message, Category, _ResourceId
               | order by TimeGenerated desc" \
-              --output table
-
-            echo "🔎 Fetching all errors from Application Insights..."
-            az monitor log-analytics query \
-              --workspace "$workspace_id" \
-              --analytics-query "
-              union exceptions, traces
-              | where severityLevel == 'Error'
-              | project timestamp, message, type, operation_Name, cloud_RoleInstance
-              | order by timestamp desc" \
               --output table
 
             echo "🔎 Fetching all errors from Kubernetes Logs..."
             az monitor log-analytics query \
               --workspace "$workspace_id" \
               --analytics-query "
-              ContainerLog
-              | where LogLevel == 'Error' or LogMessage contains 'error'
-              | project TimeGenerated, Name, Namespace, LogMessage
+              let kubeLogs = dynamic(['ContainerLog', 'KubeEvents']);
+              union isfuzzy=true withsource=TableName kubeLogs
+              | where LogMessage contains 'error' or LogLevel == 'Error'
+              | project TimeGenerated, TableName, Namespace, LogMessage
               | order by TimeGenerated desc" \
               --output table
           displayName: 'Run KQL Queries for Errors'
