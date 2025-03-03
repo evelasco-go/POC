@@ -66,11 +66,11 @@ stages:
             az monitor app-insights query \
               --app $(app_insights_name) \
               --analytics-query "
-              union traces, requests, dependencies, exceptions
+              union traces, requests, dependencies, exceptions, pageViews, availabilityResults, performanceCounters
               | where severityLevel == 3 or message contains 'Error'
-              | project timestamp=timestamp_t, message, type, operation_Name, cloud_RoleInstance
+              | project timestamp, message, type, operation_Name, cloud_RoleInstance, duration, resultCode, client_Type
               | order by timestamp desc" \
               --output table
 
             echo "✅ KQL query executed successfully."
-          displayName: 'Execute KQL Query in App Insights'
+          displayName: 'Execute Extended KQL Query in App Insights'
