@@ -1,0 +1,76 @@
+trigger:
+  - dev
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azure_subscription_id: "15e60859-88d7-4c84-943f-55488479910c"
+  azure_client_id: "9a7b7fdd-5a88-46e3-8d9b-b78042012e30"
+  azure_client_secret: "s6h8Q~WNY_QKu92SobDd7FnfSIWJsYSYmKeF2dw0"
+  azure_tenant_id: "fd3a4a13-0cd8-4c1c-ba4c-e4995f5ee282"
+  location: "East US"
+  resource_group_name: "Goreg4"
+  app_insights_name: "Goreg4-AppInsights"
+
+stages:
+- stage: SetupMonitoring
+  displayName: 'Setup Application Insights Monitoring'
+  jobs:
+    - job: SetupResources
+      displayName: 'Enable App Insights'
+      steps:
+        - script: |
+            echo "🔑 Logging into Azure..."
+            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+            az account set --subscription $(azure_subscription_id)
+          displayName: 'Authenticate with Azure'
+
+        - script: |
+            echo "🔎 Checking if Application Insights exists..."
+            app_insights_id=$(az resource show \
+              --resource-group $(resource_group_name) \
+              --resource-type "Microsoft.Insights/components" \
+              --name $(app_insights_name) \
+              --query "id" -o tsv || echo "")
+
+            if [ -z "$app_insights_id" ]; then
+              echo "⚠️ Application Insights not found. Creating..."
+              az monitor app-insights component create \
+                --app $(app_insights_name) \
+                --location $(location) \
+                --resource-group $(resource_group_name) \
+                --kind web \
+                --application-type web
+              echo "✅ Application Insights created."
+            else
+              echo "✅ Application Insights already exists."
+            fi
+          displayName: 'Create Application Insights if Missing'
+
+- stage: RunKQLQuery
+  displayName: 'Run KQL Query in Application Insights'
+  dependsOn: SetupMonitoring
+  jobs:
+    - job: RunSavedQuery
+      displayName: 'Fetch Errors from Logs'
+      steps:
+        - script: |
+            echo "🔑 Logging into Azure..."
+            az login --service-principal -u $(azure_client_id) -p $(azure_client_secret) --tenant $(azure_tenant_id)
+            az account set --subscription $(azure_subscription_id)
+          displayName: 'Authenticate with Azure'
+
+        - script: |
+            echo "🔎 Running KQL query in Application Insights..."
+            az monitor app-insights query \
+              --app $(app_insights_name) \
+              --analytics-query "
+              union traces, requests, dependencies, exceptions
+              | where severityLevel == 3 or message contains 'Error'
+              | project timestamp=timestamp_t, message, type, operation_Name, cloud_RoleInstance
+              | order by timestamp desc" \
+              --output table
+
+            echo "✅ KQL query executed successfully."
+          displayName: 'Execute KQL Query in App Insights'
